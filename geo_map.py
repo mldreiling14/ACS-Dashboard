@@ -79,6 +79,25 @@ def get_nc_counties_geojson(force_refresh: bool = False) -> dict:
     return nc_geojson
 
 
+def _geojson_bounds(geojson: dict) -> tuple[float, float, float, float]:
+    """min_lon, max_lon, min_lat, max_lat across every ring of every feature."""
+    min_lon, max_lon, min_lat, max_lat = 180.0, -180.0, 90.0, -90.0
+
+    def walk(coords):
+        nonlocal min_lon, max_lon, min_lat, max_lat
+        if isinstance(coords[0], (int, float)):
+            lon, lat = coords[0], coords[1]
+            min_lon, max_lon = min(min_lon, lon), max(max_lon, lon)
+            min_lat, max_lat = min(min_lat, lat), max(max_lat, lat)
+        else:
+            for c in coords:
+                walk(c)
+
+    for feature in geojson["features"]:
+        walk(feature["geometry"]["coordinates"])
+    return min_lon, max_lon, min_lat, max_lat
+
+
 def _format_value(value: float, value_format: str) -> str:
     if value_format == "currency":
         return f"${value:,.0f}"
@@ -175,7 +194,23 @@ def build_choropleth(
 
     # scope="usa" locks the projection to Albers USA, which tilts a single state's shape to
     # keep the whole country compact -- mercator is the standard north-up projection instead.
-    fig.update_geos(projection_type="mercator", fitbounds="locations", visible=False, bgcolor=SURFACE)
+    #
+    # fitbounds="locations" is unreliable here: it computes its fit against the figure's
+    # *default* initial size, and since this figure has no explicit width (it's meant to
+    # stretch to fill the card), the real rendered width is only known in-browser after
+    # layout -- so the fit ends up tiny and centered in a lot of dead space. Setting the
+    # lon/lat range explicitly (with a little padding) sizes off the geometry itself instead,
+    # independent of viewport width, and lets the geo subplot's own autoscale fill the card.
+    min_lon, max_lon, min_lat, max_lat = _geojson_bounds(geojson)
+    lon_pad = (max_lon - min_lon) * 0.03
+    lat_pad = (max_lat - min_lat) * 0.03
+    fig.update_geos(
+        projection_type="mercator",
+        lonaxis_range=[min_lon - lon_pad, max_lon + lon_pad],
+        lataxis_range=[min_lat - lat_pad, max_lat + lat_pad],
+        visible=False,
+        bgcolor=SURFACE,
+    )
     fig.update_layout(
         title=dict(text=metrics[0].label, x=0.02, xanchor="left"),
         updatemenus=[dict(buttons=metric_buttons, direction="down", x=0.02, y=1.16, xanchor="left")],
@@ -184,6 +219,7 @@ def build_choropleth(
         plot_bgcolor=SURFACE,
         margin=dict(l=0, r=0, t=70, b=0),
         height=560,
+        autosize=True,
         font=dict(family="system-ui, -apple-system, 'Segoe UI', sans-serif", color="#0b0b0b"),
     )
     return fig
