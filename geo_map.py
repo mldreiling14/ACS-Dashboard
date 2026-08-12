@@ -219,7 +219,7 @@ def build_choropleth(
         sliders=[year_slider],
         paper_bgcolor=SURFACE,
         plot_bgcolor=SURFACE,
-        margin=dict(l=0, r=0, t=60, b=0),
+        margin=dict(l=20, r=20, t=70, b=20),
         height=560,
         autosize=True,
         font=dict(family="system-ui, -apple-system, 'Segoe UI', sans-serif", color="#0b0b0b"),
@@ -273,7 +273,7 @@ def build_trend_chart(
         updatemenus=[dict(buttons=buttons, direction="down", x=0.02, y=1.18, xanchor="left")],
         paper_bgcolor=SURFACE,
         plot_bgcolor=SURFACE,
-        margin=dict(l=50, r=20, t=50, b=130),
+        margin=dict(l=60, r=40, t=70, b=150),
         height=480,
         # 7 series wrap to 2 legend rows -- pushed well below the rangeslider (not just below
         # the x-axis) so the wrapped second row doesn't land on top of the slider's mini-chart.

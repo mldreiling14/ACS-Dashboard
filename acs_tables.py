@@ -222,6 +222,12 @@ MAP_METRICS: list[MapMetricSpec] = [
     MapMetricSpec("veteran_median_income", "Median income, veterans", "B21004", "Tealgrn", "currency"),
 ]
 
+# Full county-data-table metrics: veteran_count (raw estimate, not on the map/trend charts)
+# plus every map metric -- feeds the "all counties" explorer table.
+ALL_TABLE_METRICS: list[MapMetricSpec] = [
+    MapMetricSpec("veteran_count", "Veteran count", "DP02", "Blues", "count"),
+] + MAP_METRICS
+
 
 if __name__ == "__main__":
     for year in (2015, 2018, 2019, 2023):

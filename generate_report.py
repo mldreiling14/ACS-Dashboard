@@ -18,13 +18,14 @@ from jinja2 import Environment, FileSystemLoader
 
 from acs_metrics import (
     VETERAN_COUNT_LABEL,
+    all_counties_table,
     build_store,
     county_metrics_for,
     focus_county_bar_rows,
     focus_county_card,
     trend_series,
 )
-from acs_tables import MAP_METRICS, YEARS, focus_fips
+from acs_tables import ALL_TABLE_METRICS, MAP_METRICS, YEARS, focus_fips
 from geo_map import build_choropleth, build_trend_chart, get_nc_counties_geojson, render_html
 from scrape_acs_resources import scrape
 
@@ -62,6 +63,8 @@ def build_report() -> None:
         {"name": name, "fips": fips, "metrics": focus_county_card(store, fips, map_year)} for name, fips in county_order
     ]
 
+    all_counties = all_counties_table(store, map_year, ALL_TABLE_METRICS)
+
     bar_rows = focus_county_bar_rows(store, map_year)
     max_count = max((r.value for r in bar_rows), default=1)
     estimate_rows = [
@@ -84,7 +87,7 @@ def build_report() -> None:
 
     env = Environment(loader=FileSystemLoader(BASE_DIR / "templates"))
     env.filters["fmt"] = lambda value, value_format: (
-        f"${value:,.0f}" if value_format == "currency" else f"{value:.1f}%"
+        f"${value:,.0f}" if value_format == "currency" else f"{value:,.0f}" if value_format == "count" else f"{value:.1f}%"
     )
     template = env.get_template("report_template.html")
     html = template.render(
@@ -97,6 +100,8 @@ def build_report() -> None:
         focus_cards=focus_cards,
         estimates=estimate_rows,
         variable_label=VETERAN_COUNT_LABEL,
+        all_counties=all_counties,
+        all_metrics=ALL_TABLE_METRICS,
         data_status=data_status,
         popular_tables=scraped["popular_tables"],
         resource_links=scraped["resource_links"],

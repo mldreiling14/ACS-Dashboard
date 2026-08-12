@@ -81,6 +81,27 @@
   th { color: var(--text-muted); font-weight: 600; }
   td:last-child, th:last-child { text-align: right; font-variant-numeric: tabular-nums; }
 
+  /* All-counties explorer table */
+  .table-controls { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 0.9rem; }
+  .table-controls input[type="search"] {
+    flex: 0 1 260px; padding: 0.45rem 0.7rem; border-radius: 8px; border: 1px solid var(--border);
+    background: var(--page); color: var(--text-primary); font-size: 0.85rem;
+  }
+  .table-controls input[type="search"]:focus { outline: 2px solid var(--series-1); outline-offset: -1px; }
+  .table-count { color: var(--text-muted); font-size: 0.8rem; white-space: nowrap; }
+  .table-scroll { overflow-x: auto; }
+  table.data-table { min-width: 760px; }
+  table.data-table th[data-sort] { cursor: pointer; user-select: none; white-space: nowrap; }
+  table.data-table th[data-sort]:hover { color: var(--text-primary); }
+  table.data-table th[data-sort]::after { content: "↕"; color: var(--text-muted); font-size: 0.75em; margin-left: 0.3em; }
+  table.data-table th[data-sort].sort-asc::after { content: "↑"; color: var(--series-1); }
+  table.data-table th[data-sort].sort-desc::after { content: "↓"; color: var(--series-1); }
+  table.data-table tbody tr.is-hidden { display: none; }
+  .rel-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-left: 0.4em; vertical-align: middle; }
+  .rel-dot.reliable   { background: var(--flag-good); }
+  .rel-dot.caution    { background: var(--flag-caution); }
+  .rel-dot.unreliable { background: var(--flag-bad); }
+
   ul.resource-list { list-style: none; margin: 0; padding: 0; }
   ul.resource-list li { padding: 0.5rem 0; border-bottom: 1px solid var(--gridline); }
   ul.resource-list li:last-child { border-bottom: none; }
@@ -174,6 +195,44 @@
   </section>
 
   <section class="card">
+    <h2>All counties — full data ({{ map_year }})</h2>
+    <p class="caption">Every NC county tracked, every metric, with margin of error and reliability. Click a column header to sort; search to filter by county.</p>
+    <div class="table-controls">
+      <input type="search" id="county-search" placeholder="Search county…" aria-label="Search county">
+      <span class="table-count" id="county-count"></span>
+    </div>
+    <div class="table-scroll">
+      <table class="data-table" id="all-counties-table">
+        <thead>
+          <tr>
+            <th data-sort="string">County</th>
+            {% for m in all_metrics %}
+            <th data-sort="number">{{ m.label }}</th>
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in all_counties %}
+          <tr>
+            <td data-value="{{ row.name }}">{{ row.name }}</td>
+            {% for m in all_metrics %}
+            {% set cm = row.metrics[m.key] %}
+            {% if cm %}
+            <td class="metric-value" data-value="{{ cm.value }}">
+              {{ cm.value | fmt(m.value_format) }} <span class="moe">±{{ cm.moe | fmt(m.value_format) }}</span><span class="rel-dot {{ cm.reliability }}" title="{{ cm.reliability }} (CV: {{ '%.1f'|format(cm.cv) if cm.cv is not none else 'n/a' }}%)"></span>
+            </td>
+            {% else %}
+            <td class="metric-value muted" data-value="-1">no data</td>
+            {% endif %}
+            {% endfor %}
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="card">
     <h2>Popular ACS Data Profile tables</h2>
     <p class="caption">Scraped from the ACS data landing page</p>
     <table>
@@ -216,5 +275,49 @@
     Built with the Census Data API and public ACS resources · <a href="https://www.census.gov/programs-surveys/acs/data.html" target="_blank" rel="noopener">census.gov/programs-surveys/acs/data.html</a>
   </footer>
 </main>
+<script>
+(function () {
+  var table = document.getElementById('all-counties-table');
+  if (!table) return;
+  var tbody = table.tBodies[0];
+  var headers = table.tHead.rows[0].cells;
+  var rows = Array.prototype.slice.call(tbody.rows);
+
+  function updateCount() {
+    var visible = rows.filter(function (r) { return !r.classList.contains('is-hidden'); }).length;
+    document.getElementById('county-count').textContent = visible + ' of ' + rows.length + ' counties';
+  }
+
+  Array.prototype.forEach.call(headers, function (th, colIndex) {
+    var sortType = th.getAttribute('data-sort');
+    if (!sortType) return;
+    th.addEventListener('click', function () {
+      var asc = !th.classList.contains('sort-asc');
+      Array.prototype.forEach.call(headers, function (h) { h.classList.remove('sort-asc', 'sort-desc'); });
+      th.classList.add(asc ? 'sort-asc' : 'sort-desc');
+
+      rows.sort(function (a, b) {
+        var av = a.cells[colIndex].getAttribute('data-value');
+        var bv = b.cells[colIndex].getAttribute('data-value');
+        var cmp = sortType === 'number' ? (parseFloat(av) - parseFloat(bv)) : av.localeCompare(bv);
+        return asc ? cmp : -cmp;
+      });
+      rows.forEach(function (r) { tbody.appendChild(r); });
+    });
+  });
+
+  var search = document.getElementById('county-search');
+  search.addEventListener('input', function () {
+    var q = search.value.trim().toLowerCase();
+    rows.forEach(function (r) {
+      var name = r.cells[0].getAttribute('data-value').toLowerCase();
+      r.classList.toggle('is-hidden', q.length > 0 && name.indexOf(q) === -1);
+    });
+    updateCount();
+  });
+
+  updateCount();
+})();
+</script>
 </body>
 </html>

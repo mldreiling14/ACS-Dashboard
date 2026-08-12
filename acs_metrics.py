@@ -113,6 +113,22 @@ def focus_county_bar_rows(store: MetricsStore, year: int) -> list[CountyMetric]:
     return sorted(rows, key=lambda r: r.value, reverse=True)
 
 
+def all_counties_table(store: MetricsStore, year: int, metrics: list) -> list[dict]:
+    """Every county with a row for the given year, across all `metrics` -- feeds the full data table."""
+    fips_set: set[str] = set()
+    for m in metrics:
+        fips_set.update(store.by_metric.get(m.key, {}).get(year, {}).keys())
+    rows = [
+        {
+            "name": store.county_names.get(fips, fips),
+            "fips": fips,
+            "metrics": {m.key: store.by_metric.get(m.key, {}).get(year, {}).get(fips) for m in metrics},
+        }
+        for fips in fips_set
+    ]
+    return sorted(rows, key=lambda r: r["name"])
+
+
 def latest_year_with_data(store: MetricsStore, metric_key: str) -> int:
     for year in sorted(YEARS, reverse=True):
         if store.by_metric.get(metric_key, {}).get(year):
