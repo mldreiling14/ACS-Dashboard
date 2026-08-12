@@ -164,11 +164,14 @@ def build_choropleth(
         frames.append(go.Frame(name=str(year), data=frame_traces))
     fig.frames = frames
 
+    # No in-figure title: the dropdown button itself already names the current metric, and a
+    # second title layered above it fought the dropdown for the same slice of top margin and
+    # ended up overlapping/obscured by it. One label instead of two overlapping ones.
     metric_buttons = [
         dict(
             label=metric.label,
             method="update",
-            args=[{"visible": [j == i for j in range(len(metrics))]}, {"title.text": metric.label}],
+            args=[{"visible": [j == i for j in range(len(metrics))]}],
         )
         for i, metric in enumerate(metrics)
     ]
@@ -212,12 +215,11 @@ def build_choropleth(
         bgcolor=SURFACE,
     )
     fig.update_layout(
-        title=dict(text=metrics[0].label, x=0.02, xanchor="left"),
-        updatemenus=[dict(buttons=metric_buttons, direction="down", x=0.02, y=1.16, xanchor="left")],
+        updatemenus=[dict(buttons=metric_buttons, direction="down", x=0.02, y=1.18, xanchor="left")],
         sliders=[year_slider],
         paper_bgcolor=SURFACE,
         plot_bgcolor=SURFACE,
-        margin=dict(l=0, r=0, t=70, b=0),
+        margin=dict(l=0, r=0, t=60, b=0),
         height=560,
         autosize=True,
         font=dict(family="system-ui, -apple-system, 'Segoe UI', sans-serif", color="#0b0b0b"),
@@ -253,30 +255,33 @@ def build_trend_chart(
             )
 
     n_counties = len(county_order)
+    # No in-figure title -- see the matching note in build_choropleth; the dropdown already
+    # names the current metric.
     buttons = [
         dict(
             label=metric.label,
             method="update",
             args=[
                 {"visible": [i == m for m in range(len(metrics)) for _ in range(n_counties)]},
-                {"title.text": metric.label, "yaxis.ticksuffix": "%" if metric.value_format == "percent" else ""},
+                {"yaxis.ticksuffix": "%" if metric.value_format == "percent" else ""},
             ],
         )
         for i, metric in enumerate(metrics)
     ]
 
     fig.update_layout(
-        title=dict(text=metrics[0].label, x=0.02, xanchor="left"),
-        updatemenus=[dict(buttons=buttons, direction="down", x=0.02, y=1.15, xanchor="left")],
+        updatemenus=[dict(buttons=buttons, direction="down", x=0.02, y=1.18, xanchor="left")],
         paper_bgcolor=SURFACE,
         plot_bgcolor=SURFACE,
-        margin=dict(l=50, r=20, t=70, b=60),
+        margin=dict(l=50, r=20, t=50, b=130),
         height=480,
-        legend=dict(orientation="h", y=-0.25),
+        # 7 series wrap to 2 legend rows -- pushed well below the rangeslider (not just below
+        # the x-axis) so the wrapped second row doesn't land on top of the slider's mini-chart.
+        legend=dict(orientation="h", y=-0.42),
         xaxis=dict(
             dtick=1,
             gridcolor="#e1e0d9",
-            rangeslider=dict(visible=True, thickness=0.08, bgcolor=SURFACE, bordercolor="#e1e0d9", borderwidth=1),
+            rangeslider=dict(visible=True, thickness=0.06, bgcolor=SURFACE, bordercolor="#e1e0d9", borderwidth=1),
         ),
         yaxis=dict(gridcolor="#e1e0d9", ticksuffix="%" if metrics[0].value_format == "percent" else ""),
         font=dict(family="system-ui, -apple-system, 'Segoe UI', sans-serif", color="#0b0b0b"),
