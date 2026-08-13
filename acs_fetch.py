@@ -101,8 +101,10 @@ def _fetch_live(spec: TableSpec, year: int, retries: int = 3) -> list[dict[str, 
     raise last_error  # type: ignore[misc]
 
 
-def fetch_table_year(table_id: str, year: int, force_refresh: bool = False) -> TableFetchResult:
-    spec = TABLES[table_id]
+def fetch_table_year(
+    table_id: str, year: int, force_refresh: bool = False, tables: dict[str, TableSpec] = TABLES
+) -> TableFetchResult:
+    spec = tables[table_id]
 
     if not force_refresh:
         cached = _read_json(_cache_path(table_id, year))
@@ -133,11 +135,13 @@ def fetch_table_year(table_id: str, year: int, force_refresh: bool = False) -> T
     return TableFetchResult(table_id, year, [], "unavailable", None)
 
 
-def get_all(force_refresh: bool = False) -> dict[tuple[str, int], TableFetchResult]:
+def get_all(
+    force_refresh: bool = False, tables: dict[str, TableSpec] = TABLES
+) -> dict[tuple[str, int], TableFetchResult]:
     results: dict[tuple[str, int], TableFetchResult] = {}
-    for table_id in TABLES:
+    for table_id in tables:
         for year in YEARS:
-            result = fetch_table_year(table_id, year, force_refresh=force_refresh)
+            result = fetch_table_year(table_id, year, force_refresh=force_refresh, tables=tables)
             results[(table_id, year)] = result
     return results
 

@@ -15,6 +15,8 @@ from acs_tables import (
     NC_STATE_FIPS,
     TABLES,
     YEARS,
+    MapMetricSpec,
+    TableSpec,
     coefficient_of_variation,
     reliability_flag,
 )
@@ -51,15 +53,15 @@ def _county_name(row: dict[str, str]) -> str:
     return row["NAME"].split(",")[0]
 
 
-def build_store(force_refresh: bool = False) -> MetricsStore:
-    fetch_results = get_all(force_refresh=force_refresh)
+def build_store(force_refresh: bool = False, tables: dict[str, TableSpec] = TABLES) -> MetricsStore:
+    fetch_results = get_all(force_refresh=force_refresh, tables=tables)
 
     by_metric: dict[str, dict[int, dict[str, CountyMetric]]] = {}
     county_names: dict[str, str] = {}
     data_status: list[dict] = []
 
     for (table_id, year), result in fetch_results.items():
-        spec = TABLES[table_id]
+        spec = tables[table_id]
         data_status.append(
             {"table_id": table_id, "year": year, "source": result.source, "as_of_year": result.as_of_year}
         )
@@ -99,8 +101,10 @@ def trend_series(store: MetricsStore, metric_key: str, fips: str) -> list[County
     return series
 
 
-def focus_county_card(store: MetricsStore, fips: str, year: int) -> dict[str, CountyMetric | None]:
-    return {metric.key: store.by_metric.get(metric.key, {}).get(year, {}).get(fips) for metric in MAP_METRICS}
+def focus_county_card(
+    store: MetricsStore, fips: str, year: int, metrics: list[MapMetricSpec] = MAP_METRICS
+) -> dict[str, CountyMetric | None]:
+    return {metric.key: store.by_metric.get(metric.key, {}).get(year, {}).get(fips) for metric in metrics}
 
 
 def focus_county_bar_rows(store: MetricsStore, year: int) -> list[CountyMetric]:

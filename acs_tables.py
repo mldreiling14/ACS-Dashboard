@@ -208,7 +208,8 @@ class MapMetricSpec:
     label: str
     table_id: str
     colorscale: str
-    value_format: str  # "percent" | "currency"
+    value_format: str  # "percent" | "currency" | "count" | "minutes"
+    condition: str = ""  # optional grouping key, e.g. a vital-conditions framework category
 
 
 MAP_METRICS: list[MapMetricSpec] = [
