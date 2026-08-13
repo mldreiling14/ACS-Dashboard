@@ -273,11 +273,11 @@ def build_trend_chart(
         updatemenus=[dict(buttons=buttons, direction="down", x=0.02, y=1.18, xanchor="left")],
         paper_bgcolor=SURFACE,
         plot_bgcolor=SURFACE,
-        margin=dict(l=60, r=40, t=70, b=150),
+        margin=dict(l=60, r=40, t=70, b=210),
         height=480,
         # 7 series wrap to 2 legend rows -- pushed well below the rangeslider (not just below
         # the x-axis) so the wrapped second row doesn't land on top of the slider's mini-chart.
-        legend=dict(orientation="h", y=-0.42),
+        legend=dict(orientation="h", y=-0.62),
         xaxis=dict(
             dtick=1,
             gridcolor="#e1e0d9",

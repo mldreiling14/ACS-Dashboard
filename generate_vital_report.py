@@ -25,6 +25,14 @@ from vital_tables import COMPARE_METRICS, COMPARE_TABLES, VITAL_CONDITIONS, VITA
 BASE_DIR = Path(__file__).parent
 OUTPUT_PATH = BASE_DIR / "vital_conditions.html"
 
+# Plain-language reliability explanations, shown as hover text next to every reliability dot --
+# the CV-based reliable/caution/unreliable flags mean nothing to a reader who isn't a statistician.
+RELIABILITY_EXPLAINER = {
+    "reliable": "Reliable: the margin of error is small relative to the estimate, so this number is fairly precise.",
+    "caution": "Use with caution: the margin of error is fairly large relative to the estimate. Treat this as an approximate figure, not an exact one.",
+    "unreliable": "Unreliable: the margin of error is very large relative to the estimate. Treat this as a rough signal only, not a precise number.",
+}
+
 
 def _resolve_map_year(store) -> int:
     """Latest year where every map metric has data -- keeps every dropdown option non-empty."""
@@ -152,7 +160,7 @@ def build_report() -> None:
 
     env = Environment(loader=FileSystemLoader(BASE_DIR / "templates"))
     env.filters["fmt"] = lambda value, value_format: (
-        f"${value:,.0f}"
+        (f"-${abs(value):,.0f}" if value < 0 else f"${value:,.0f}")
         if value_format == "currency"
         else f"{value:,.0f}"
         if value_format == "count"
@@ -175,6 +183,7 @@ def build_report() -> None:
         compare_focus=compare_focus,
         compare_all_counties=compare_all_counties,
         compare_metrics=COMPARE_METRICS,
+        reliability_explainer=RELIABILITY_EXPLAINER,
         data_status=data_status,
         popular_tables=scraped["popular_tables"],
         resource_links=scraped["resource_links"],
