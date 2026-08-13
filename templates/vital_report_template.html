@@ -14,6 +14,7 @@
     --gridline:       #e1e0d9;
     --baseline:       #c3c2b7;
     --series-1:       #2a78d6;
+    --series-2:       #8a8a86;
     --border:         rgba(11,11,11,0.10);
     --flag-good:      #0ca30c;
     --flag-caution:   #fab219;
@@ -23,7 +24,7 @@
     :root { color-scheme: dark;
       --surface-1: #1a1a19; --page: #0d0d0d; --text-primary: #ffffff;
       --text-secondary: #c3c2b7; --text-muted: #898781; --gridline: #2c2c2a;
-      --baseline: #383835; --series-1: #3987e5; --border: rgba(255,255,255,0.10);
+      --baseline: #383835; --series-1: #3987e5; --series-2: #98978f; --border: rgba(255,255,255,0.10);
     }
   }
   * { box-sizing: border-box; }
@@ -77,6 +78,26 @@
   .reliability-badge.reliable .dot   { background: var(--flag-good); }
   .reliability-badge.caution .dot    { background: var(--flag-caution); }
   .reliability-badge.unreliable .dot { background: var(--flag-bad); }
+
+  /* Veteran vs. civilian comparison */
+  .compare-block { margin-bottom: 1.75rem; }
+  .compare-block:last-child { margin-bottom: 0; }
+  .compare-block h3 { font-size: 0.95rem; margin: 0 0 0.3rem; }
+  .compare-block .civilian-note { color: var(--text-muted); font-size: 0.78rem; margin: 0 0 0.75rem; }
+  .compare-legend { display: flex; gap: 1.25rem; font-size: 0.78rem; color: var(--text-secondary); margin-bottom: 0.6rem; }
+  .compare-legend .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 0.35rem; vertical-align: middle; }
+  .compare-legend .swatch.veteran { background: var(--series-1); }
+  .compare-legend .swatch.civilian { background: var(--series-2); }
+  .compare-row { display: grid; grid-template-columns: 130px 1fr; gap: 0.75rem; align-items: center; padding: 0.45rem 0; border-bottom: 1px solid var(--gridline); }
+  .compare-row:last-child { border-bottom: none; }
+  .compare-row .county-name { font-size: 0.85rem; color: var(--text-secondary); text-align: right; }
+  .compare-bars { display: flex; flex-direction: column; gap: 3px; }
+  .compare-bar-line { display: flex; align-items: center; gap: 0.6rem; }
+  .compare-bar-line .bar-track { flex: 1; height: 10px; background: var(--page); border-radius: 3px; overflow: hidden; }
+  .compare-bar-line .bar-fill { height: 100%; border-radius: 3px; }
+  .compare-bar-line.veteran .bar-fill { background: var(--series-1); }
+  .compare-bar-line.civilian .bar-fill { background: var(--series-2); }
+  .compare-bar-line .bar-value { font-size: 0.78rem; min-width: 6.5rem; text-align: right; font-variant-numeric: tabular-nums; }
 
   /* All-counties explorer table */
   .table-controls { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 0.9rem; }
@@ -189,6 +210,47 @@
   </section>
 
   <section class="card">
+    <h2>Veteran vs. civilian comparison ({{ map_year }})</h2>
+    <p class="caption">
+      Focus counties. ACS only cross-tabulates a handful of things by veteran status: poverty, unemployment,
+      personal income, and educational attainment below, plus veteran-only service-connected disability rating.
+      It does <strong>not</strong> break out health insurance, housing cost burden, vehicle access, commute time,
+      or broadband access by veteran status -- those vital-conditions metrics above are population-wide only,
+      with no veteran-specific split available anywhere in ACS.
+    </p>
+    {% for block in compare_focus %}
+    <div class="compare-block">
+      <h3>{{ block.metric.label }}</h3>
+      {% if block.metric.civilian_key %}
+      <div class="compare-legend">
+        <span><span class="swatch veteran"></span>Veteran</span>
+        <span><span class="swatch civilian"></span>Civilian</span>
+      </div>
+      {% else %}
+      <p class="civilian-note">Veteran-only -- service-connected disability rating has no civilian/nonveteran equivalent.</p>
+      {% endif %}
+      {% for row in block.rows %}
+      <div class="compare-row">
+        <div class="county-name">{{ row.name }}</div>
+        <div class="compare-bars">
+          <div class="compare-bar-line veteran">
+            <div class="bar-track"><div class="bar-fill" style="width: {{ row.veteran_pct }}%;"></div></div>
+            <div class="bar-value">{% if row.veteran %}{{ row.veteran.value | fmt(block.metric.value_format) }}{% else %}no data{% endif %}</div>
+          </div>
+          {% if block.metric.civilian_key %}
+          <div class="compare-bar-line civilian">
+            <div class="bar-track"><div class="bar-fill" style="width: {{ row.civilian_pct }}%;"></div></div>
+            <div class="bar-value">{% if row.civilian %}{{ row.civilian.value | fmt(block.metric.value_format) }}{% else %}no data{% endif %}</div>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endfor %}
+  </section>
+
+  <section class="card">
     <h2>All counties — full data ({{ map_year }})</h2>
     <p class="caption">Every NC county tracked, every metric, with margin of error and reliability. Click a column header to sort; search to filter by county.</p>
     <div class="table-controls">
@@ -217,6 +279,54 @@
             </td>
             {% else %}
             <td class="metric-value muted" data-value="-1">no data</td>
+            {% endif %}
+            {% endfor %}
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>All counties — veteran vs. civilian ({{ map_year }})</h2>
+    <p class="caption">Every NC county, veteran and civilian side by side wherever ACS supports the split. Click a column header to sort; search to filter by county.</p>
+    <div class="table-controls">
+      <input type="search" id="compare-search" placeholder="Search county…" aria-label="Search county">
+      <span class="table-count" id="compare-count"></span>
+    </div>
+    <div class="table-scroll">
+      <table class="data-table" id="compare-counties-table">
+        <thead>
+          <tr>
+            <th data-sort="string">County</th>
+            {% for cm in compare_metrics %}
+            <th data-sort="number">{{ cm.label }} (Veteran)</th>
+            {% if cm.civilian_key %}<th data-sort="number">{{ cm.label }} (Civilian)</th>{% endif %}
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in compare_all_counties %}
+          <tr>
+            <td data-value="{{ row.name }}">{{ row.name }}</td>
+            {% for cm in compare_metrics %}
+            {% set pair = row.metrics[cm.key] %}
+            {% if pair.veteran %}
+            <td class="metric-value" data-value="{{ pair.veteran.value }}">
+              {{ pair.veteran.value | fmt(cm.value_format) }} <span class="moe">±{{ pair.veteran.moe | fmt(cm.value_format) }}</span><span class="rel-dot {{ pair.veteran.reliability }}" title="{{ pair.veteran.reliability }} (CV: {{ '%.1f'|format(pair.veteran.cv) if pair.veteran.cv is not none else 'n/a' }}%)"></span>
+            </td>
+            {% else %}
+            <td class="metric-value muted" data-value="-1">no data</td>
+            {% endif %}
+            {% if cm.civilian_key %}
+              {% if pair.civilian %}
+              <td class="metric-value" data-value="{{ pair.civilian.value }}">
+                {{ pair.civilian.value | fmt(cm.value_format) }} <span class="moe">±{{ pair.civilian.moe | fmt(cm.value_format) }}</span><span class="rel-dot {{ pair.civilian.reliability }}" title="{{ pair.civilian.reliability }} (CV: {{ '%.1f'|format(pair.civilian.cv) if pair.civilian.cv is not none else 'n/a' }}%)"></span>
+              </td>
+              {% else %}
+              <td class="metric-value muted" data-value="-1">no data</td>
+              {% endif %}
             {% endif %}
             {% endfor %}
           </tr>
@@ -271,47 +381,51 @@
 </main>
 <script>
 (function () {
-  var table = document.getElementById('all-counties-table');
-  if (!table) return;
-  var tbody = table.tBodies[0];
-  var headers = table.tHead.rows[0].cells;
-  var rows = Array.prototype.slice.call(tbody.rows);
+  function wireTable(tableId, searchId, countId) {
+    var table = document.getElementById(tableId);
+    if (!table) return;
+    var tbody = table.tBodies[0];
+    var headers = table.tHead.rows[0].cells;
+    var rows = Array.prototype.slice.call(tbody.rows);
 
-  function updateCount() {
-    var visible = rows.filter(function (r) { return !r.classList.contains('is-hidden'); }).length;
-    document.getElementById('county-count').textContent = visible + ' of ' + rows.length + ' counties';
+    function updateCount() {
+      var visible = rows.filter(function (r) { return !r.classList.contains('is-hidden'); }).length;
+      document.getElementById(countId).textContent = visible + ' of ' + rows.length + ' counties';
+    }
+
+    Array.prototype.forEach.call(headers, function (th, colIndex) {
+      var sortType = th.getAttribute('data-sort');
+      if (!sortType) return;
+      th.addEventListener('click', function () {
+        var asc = !th.classList.contains('sort-asc');
+        Array.prototype.forEach.call(headers, function (h) { h.classList.remove('sort-asc', 'sort-desc'); });
+        th.classList.add(asc ? 'sort-asc' : 'sort-desc');
+
+        rows.sort(function (a, b) {
+          var av = a.cells[colIndex].getAttribute('data-value');
+          var bv = b.cells[colIndex].getAttribute('data-value');
+          var cmp = sortType === 'number' ? (parseFloat(av) - parseFloat(bv)) : av.localeCompare(bv);
+          return asc ? cmp : -cmp;
+        });
+        rows.forEach(function (r) { tbody.appendChild(r); });
+      });
+    });
+
+    var search = document.getElementById(searchId);
+    search.addEventListener('input', function () {
+      var q = search.value.trim().toLowerCase();
+      rows.forEach(function (r) {
+        var name = r.cells[0].getAttribute('data-value').toLowerCase();
+        r.classList.toggle('is-hidden', q.length > 0 && name.indexOf(q) === -1);
+      });
+      updateCount();
+    });
+
+    updateCount();
   }
 
-  Array.prototype.forEach.call(headers, function (th, colIndex) {
-    var sortType = th.getAttribute('data-sort');
-    if (!sortType) return;
-    th.addEventListener('click', function () {
-      var asc = !th.classList.contains('sort-asc');
-      Array.prototype.forEach.call(headers, function (h) { h.classList.remove('sort-asc', 'sort-desc'); });
-      th.classList.add(asc ? 'sort-asc' : 'sort-desc');
-
-      rows.sort(function (a, b) {
-        var av = a.cells[colIndex].getAttribute('data-value');
-        var bv = b.cells[colIndex].getAttribute('data-value');
-        var cmp = sortType === 'number' ? (parseFloat(av) - parseFloat(bv)) : av.localeCompare(bv);
-        return asc ? cmp : -cmp;
-      });
-      rows.forEach(function (r) { tbody.appendChild(r); });
-    });
-  });
-
-  var search = document.getElementById('county-search');
-  search.addEventListener('input', function () {
-    var q = search.value.trim().toLowerCase();
-    rows.forEach(function (r) {
-      var name = r.cells[0].getAttribute('data-value').toLowerCase();
-      r.classList.toggle('is-hidden', q.length > 0 && name.indexOf(q) === -1);
-    });
-    updateCount();
-  });
-
-  updateCount();
-})();
+  wireTable('all-counties-table', 'county-search', 'county-count');
+  wireTable('compare-counties-table', 'compare-search', 'compare-count');
 </script>
 </body>
 </html>

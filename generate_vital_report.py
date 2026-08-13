@@ -20,7 +20,7 @@ from acs_metrics import all_counties_table, build_store, county_metrics_for, foc
 from acs_tables import YEARS, focus_fips
 from geo_map import build_choropleth, build_trend_chart, get_nc_counties_geojson, render_html
 from scrape_acs_resources import scrape
-from vital_tables import VITAL_CONDITIONS, VITAL_MAP_METRICS, VITAL_TABLES
+from vital_tables import COMPARE_METRICS, COMPARE_TABLES, VITAL_CONDITIONS, VITAL_MAP_METRICS, VITAL_TABLES
 
 BASE_DIR = Path(__file__).parent
 OUTPUT_PATH = BASE_DIR / "vital_conditions.html"
@@ -34,9 +34,62 @@ def _resolve_map_year(store) -> int:
     return min(per_metric_latest)
 
 
+def _compare_focus_blocks(compare_store, county_order: list[tuple[str, str]], year: int) -> list[dict]:
+    """One block per comparison metric: focus-county veteran/civilian pairs, scaled to a
+    shared max so both bars in a block are drawn to the same axis."""
+    blocks = []
+    for cm in COMPARE_METRICS:
+        rows = []
+        values = []
+        for name, fips in county_order:
+            vet = compare_store.by_metric.get(cm.veteran_key, {}).get(year, {}).get(fips)
+            civ = compare_store.by_metric.get(cm.civilian_key, {}).get(year, {}).get(fips) if cm.civilian_key else None
+            rows.append({"name": name, "veteran": vet, "civilian": civ})
+            if vet:
+                values.append(vet.value)
+            if civ:
+                values.append(civ.value)
+        max_val = max(values, default=1) or 1
+        for row in rows:
+            row["veteran_pct"] = round(row["veteran"].value / max_val * 100, 1) if row["veteran"] else 0
+            row["civilian_pct"] = round(row["civilian"].value / max_val * 100, 1) if row["civilian"] else 0
+        blocks.append({"metric": cm, "rows": rows})
+    return blocks
+
+
+def _compare_all_counties(compare_store, year: int) -> list[dict]:
+    """Every county's veteran/civilian pair for every comparison metric -- feeds the
+    second full-data table."""
+    fips_set: set[str] = set()
+    for cm in COMPARE_METRICS:
+        fips_set.update(compare_store.by_metric.get(cm.veteran_key, {}).get(year, {}).keys())
+        if cm.civilian_key:
+            fips_set.update(compare_store.by_metric.get(cm.civilian_key, {}).get(year, {}).keys())
+    rows = [
+        {
+            "name": compare_store.county_names.get(fips, fips),
+            "fips": fips,
+            "metrics": {
+                cm.key: {
+                    "veteran": compare_store.by_metric.get(cm.veteran_key, {}).get(year, {}).get(fips),
+                    "civilian": (
+                        compare_store.by_metric.get(cm.civilian_key, {}).get(year, {}).get(fips)
+                        if cm.civilian_key
+                        else None
+                    ),
+                }
+                for cm in COMPARE_METRICS
+            },
+        }
+        for fips in fips_set
+    ]
+    return sorted(rows, key=lambda r: r["name"])
+
+
 def build_report() -> None:
     scraped = scrape()
     store = build_store(tables=VITAL_TABLES)
+    compare_store = build_store(tables=COMPARE_TABLES)
 
     county_order = list(focus_fips().items())  # [(county_name, fips), ...]
     focus_fips_set = {fips for _, fips in county_order}
@@ -63,9 +116,20 @@ def build_report() -> None:
 
     all_counties = all_counties_table(store, map_year, VITAL_MAP_METRICS)
 
+    compare_focus = _compare_focus_blocks(compare_store, county_order, map_year)
+    compare_all_counties = _compare_all_counties(compare_store, map_year)
+
     table_labels: dict[str, list[str]] = {}
     for m in VITAL_MAP_METRICS:
         table_labels.setdefault(m.table_id, []).append(m.label)
+
+    compare_table_labels: dict[str, list[str]] = {
+        "C21007_CMP": ["Poverty rate (veteran/civilian)"],
+        "B21005_CMP": ["Unemployment rate (veteran/civilian)"],
+        "B21004_CMP": ["Median personal income (veteran/civilian)"],
+        "B21003_CMP": ["Educational attainment (veteran/civilian)"],
+        "B21100_CMP": ["Service-connected disability rating"],
+    }
     data_status = [
         {
             "table_id": d["table_id"],
@@ -74,6 +138,15 @@ def build_report() -> None:
             "as_of_year": d["as_of_year"],
         }
         for d in store.data_status
+        if d["year"] == map_year
+    ] + [
+        {
+            "table_id": d["table_id"],
+            "metric_labels": ", ".join(compare_table_labels.get(d["table_id"], [d["table_id"]])),
+            "source": d["source"],
+            "as_of_year": d["as_of_year"],
+        }
+        for d in compare_store.data_status
         if d["year"] == map_year
     ]
 
@@ -99,6 +172,9 @@ def build_report() -> None:
         focus_cards=focus_cards,
         all_counties=all_counties,
         all_metrics=VITAL_MAP_METRICS,
+        compare_focus=compare_focus,
+        compare_all_counties=compare_all_counties,
+        compare_metrics=COMPARE_METRICS,
         data_status=data_status,
         popular_tables=scraped["popular_tables"],
         resource_links=scraped["resource_links"],

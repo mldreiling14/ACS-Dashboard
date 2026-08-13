@@ -18,7 +18,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from acs_tables import _cell, MapMetricSpec, TableSpec
+from acs_tables import _B21100_VARS, _b21100_derive, _cell, MapMetricSpec, TableSpec, moe_ratio, moe_sum
 
 
 @dataclass
@@ -170,8 +170,170 @@ VITAL_MAP_METRICS: list[MapMetricSpec] = [
 ]
 
 
+########################################################################################
+# Veteran vs. civilian comparison.
+#
+# ACS only cross-tabulates a handful of things by veteran status at all (see the
+# "VETERAN" groups in acs/acs5/groups.json): poverty, labor force/unemployment, personal
+# income, and educational attainment, plus veteran-only service-connected disability
+# rating. Health insurance, housing cost burden, vehicle access, commute time, and
+# broadband access -- the rest of the vital-conditions metrics above -- have no
+# veteran-status breakdown anywhere in ACS; a real comparison for those isn't available,
+# so this section only covers what the data actually supports. All codes below confirmed
+# stable 2015-2024 against the live Census API.
+########################################################################################
+
+
+@dataclass
+class ComparisonMetric:
+    key: str
+    label: str
+    value_format: str
+    veteran_key: str
+    civilian_key: str | None  # None => veteran-only, no civilian/nonveteran equivalent exists
+
+
+# C21007 -- poverty status by veteran status (two age bands: 18-64, 65+, summed).
+_C21007_CMP_VARS = [
+    "C21007_003E", "C21007_003M", "C21007_004E", "C21007_004M",  # veteran, 18-64: total, in poverty
+    "C21007_018E", "C21007_018M", "C21007_019E", "C21007_019M",  # veteran, 65+: total, in poverty
+    "C21007_010E", "C21007_010M", "C21007_011E", "C21007_011M",  # nonveteran, 18-64: total, in poverty
+    "C21007_025E", "C21007_025M", "C21007_026E", "C21007_026M",  # nonveteran, 65+: total, in poverty
+]
+
+
+def _c21007_cmp_derive(cells: dict[str, str], year: int) -> dict[str, tuple[float, float]]:
+    def rate(total_codes: list[str], poverty_codes: list[str]) -> tuple[float, float]:
+        total = sum(_cell(cells, c) for c in total_codes)
+        total_moe = moe_sum(*(_cell(cells, c.replace("E", "M")) for c in total_codes))
+        poverty = sum(_cell(cells, c) for c in poverty_codes)
+        poverty_moe = moe_sum(*(_cell(cells, c.replace("E", "M")) for c in poverty_codes))
+        if total == 0:
+            return (0.0, 0.0)
+        return (poverty / total * 100, moe_ratio(poverty, poverty_moe, total, total_moe) * 100)
+
+    return {
+        "poverty_rate_veteran": rate(["C21007_003E", "C21007_018E"], ["C21007_004E", "C21007_019E"]),
+        "poverty_rate_civilian": rate(["C21007_010E", "C21007_025E"], ["C21007_011E", "C21007_026E"]),
+    }
+
+
+# B21005 -- labor force status by veteran status (three age bands: 18-34, 35-54, 55-64, summed).
+_B21005_CMP_VARS = [
+    "B21005_004E", "B21005_004M", "B21005_006E", "B21005_006M",  # veteran 18-34: in LF, unemployed
+    "B21005_015E", "B21005_015M", "B21005_017E", "B21005_017M",  # veteran 35-54
+    "B21005_026E", "B21005_026M", "B21005_028E", "B21005_028M",  # veteran 55-64
+    "B21005_009E", "B21005_009M", "B21005_011E", "B21005_011M",  # nonveteran 18-34: in LF, unemployed
+    "B21005_020E", "B21005_020M", "B21005_022E", "B21005_022M",  # nonveteran 35-54
+    "B21005_031E", "B21005_031M", "B21005_033E", "B21005_033M",  # nonveteran 55-64
+]
+
+
+def _b21005_cmp_derive(cells: dict[str, str], year: int) -> dict[str, tuple[float, float]]:
+    def rate(lf_codes: list[str], unemployed_codes: list[str]) -> tuple[float, float]:
+        lf = sum(_cell(cells, c) for c in lf_codes)
+        lf_moe = moe_sum(*(_cell(cells, c.replace("E", "M")) for c in lf_codes))
+        unemployed = sum(_cell(cells, c) for c in unemployed_codes)
+        unemployed_moe = moe_sum(*(_cell(cells, c.replace("E", "M")) for c in unemployed_codes))
+        if lf == 0:
+            return (0.0, 0.0)
+        return (unemployed / lf * 100, moe_ratio(unemployed, unemployed_moe, lf, lf_moe) * 100)
+
+    return {
+        "unemployment_rate_veteran": rate(
+            ["B21005_004E", "B21005_015E", "B21005_026E"], ["B21005_006E", "B21005_017E", "B21005_028E"]
+        ),
+        "unemployment_rate_civilian": rate(
+            ["B21005_009E", "B21005_020E", "B21005_031E"], ["B21005_011E", "B21005_022E", "B21005_033E"]
+        ),
+    }
+
+
+# B21004 -- median personal income by veteran status (individual income, not household income --
+# a different population base than the general-population "median_household_income" metric above).
+_B21004_CMP_VARS = ["B21004_002E", "B21004_002M", "B21004_005E", "B21004_005M"]
+
+
+def _b21004_cmp_derive(cells: dict[str, str], year: int) -> dict[str, tuple[float, float]]:
+    return {
+        "median_income_veteran": (_cell(cells, "B21004_002E"), _cell(cells, "B21004_002M")),
+        "median_income_civilian": (_cell(cells, "B21004_005E"), _cell(cells, "B21004_005M")),
+    }
+
+
+# B21003 -- educational attainment by veteran status.
+_B21003_CMP_VARS = [
+    "B21003_002E", "B21003_002M",  # veteran total
+    "B21003_004E", "B21003_004M",  # veteran: HS grad
+    "B21003_005E", "B21003_005M",  # veteran: some college/associate's
+    "B21003_006E", "B21003_006M",  # veteran: bachelor's+
+    "B21003_007E", "B21003_007M",  # nonveteran total
+    "B21003_009E", "B21003_009M",  # nonveteran: HS grad
+    "B21003_010E", "B21003_010M",  # nonveteran: some college/associate's
+    "B21003_011E", "B21003_011M",  # nonveteran: bachelor's+
+]
+
+
+def _b21003_cmp_derive(cells: dict[str, str], year: int) -> dict[str, tuple[float, float]]:
+    def rate(total_code: str, part_codes: list[str]) -> tuple[float, float]:
+        total = _cell(cells, total_code)
+        total_moe = _cell(cells, total_code.replace("E", "M"))
+        part = sum(_cell(cells, c) for c in part_codes)
+        part_moe = moe_sum(*(_cell(cells, c.replace("E", "M")) for c in part_codes))
+        if total == 0:
+            return (0.0, 0.0)
+        return (part / total * 100, moe_ratio(part, part_moe, total, total_moe) * 100)
+
+    return {
+        "hs_grad_or_higher_pct_veteran": rate("B21003_002E", ["B21003_004E", "B21003_005E", "B21003_006E"]),
+        "hs_grad_or_higher_pct_civilian": rate("B21003_007E", ["B21003_009E", "B21003_010E", "B21003_011E"]),
+        "bachelors_or_higher_pct_veteran": rate("B21003_002E", ["B21003_006E"]),
+        "bachelors_or_higher_pct_civilian": rate("B21003_007E", ["B21003_011E"]),
+    }
+
+
+COMPARE_TABLES: dict[str, TableSpec] = {
+    "C21007_CMP": TableSpec("C21007_CMP", "acs/acs5", lambda year: _C21007_CMP_VARS, _c21007_cmp_derive),
+    "B21005_CMP": TableSpec("B21005_CMP", "acs/acs5", lambda year: _B21005_CMP_VARS, _b21005_cmp_derive),
+    "B21004_CMP": TableSpec("B21004_CMP", "acs/acs5", lambda year: _B21004_CMP_VARS, _b21004_cmp_derive),
+    "B21003_CMP": TableSpec("B21003_CMP", "acs/acs5", lambda year: _B21003_CMP_VARS, _b21003_cmp_derive),
+    # Disability rating is inherently veteran-only -- no civilian population has a
+    # service-connected disability rating, so there's no comparison to draw here.
+    "B21100_CMP": TableSpec("B21100_CMP", "acs/acs5", lambda year: _B21100_VARS, _b21100_derive),
+}
+
+COMPARE_METRICS: list[ComparisonMetric] = [
+    ComparisonMetric("poverty_rate", "Poverty rate", "percent", "poverty_rate_veteran", "poverty_rate_civilian"),
+    ComparisonMetric(
+        "unemployment_rate", "Unemployment rate", "percent", "unemployment_rate_veteran", "unemployment_rate_civilian"
+    ),
+    ComparisonMetric(
+        "median_income", "Median personal income", "currency", "median_income_veteran", "median_income_civilian"
+    ),
+    ComparisonMetric(
+        "hs_grad_or_higher_pct",
+        "High school graduate or higher",
+        "percent",
+        "hs_grad_or_higher_pct_veteran",
+        "hs_grad_or_higher_pct_civilian",
+    ),
+    ComparisonMetric(
+        "bachelors_or_higher_pct",
+        "Bachelor's degree or higher",
+        "percent",
+        "bachelors_or_higher_pct_veteran",
+        "bachelors_or_higher_pct_civilian",
+    ),
+    ComparisonMetric(
+        "disability_rating_pct", "Service-connected disability rating", "percent", "disability_rating_pct", None
+    ),
+]
+
+
 if __name__ == "__main__":
     for year in (2015, 2018, 2019, 2020, 2023, 2024):
         print(year, "broadband code:", _broadband_code(year))
     print("Vital table ids:", list(VITAL_TABLES))
     print("Vital metrics:", [m.key for m in VITAL_MAP_METRICS])
+    print("Compare table ids:", list(COMPARE_TABLES))
+    print("Compare metrics:", [(m.key, m.veteran_key, m.civilian_key) for m in COMPARE_METRICS])
