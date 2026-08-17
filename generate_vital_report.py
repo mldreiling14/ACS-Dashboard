@@ -132,10 +132,10 @@ def build_report() -> None:
         table_labels.setdefault(m.table_id, []).append(m.label)
 
     compare_table_labels: dict[str, list[str]] = {
-        "C21007_CMP": ["Poverty rate (veteran/civilian)"],
-        "B21005_CMP": ["Unemployment rate (veteran/civilian)"],
-        "B21004_CMP": ["Median personal income (veteran/civilian)"],
-        "B21003_CMP": ["Educational attainment (veteran/civilian)"],
+        "C21007_CMP": ["Poverty rate (Veteran/civilian)"],
+        "B21005_CMP": ["Unemployment rate (Veteran/civilian)"],
+        "B21004_CMP": ["Median personal income (Veteran/civilian)"],
+        "B21003_CMP": ["Educational attainment (Veteran/civilian)"],
         "B21100_CMP": ["Service-connected disability rating"],
     }
     data_status = [

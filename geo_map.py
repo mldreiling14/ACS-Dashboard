@@ -35,13 +35,29 @@ NC_STATE_FIPS = "37"
 
 SURFACE = "#fcfcfb"  # matches --surface-1 in the report's light palette (references/palette.md)
 
-# Sequential blue ramp, 100->700, from references/palette.md.
+# Sequential blue ramp, 100->700, from references/palette.md. Fallback for any metric with no
+# vital-conditions category (e.g. the veteran-metrics report's map, which has none).
 BLUE_SEQUENTIAL = [
     (0 / 12, "#cde2fb"), (1 / 12, "#b7d3f6"), (2 / 12, "#9ec5f4"), (3 / 12, "#86b6ef"),
     (4 / 12, "#6da7ec"), (5 / 12, "#5598e7"), (6 / 12, "#3987e5"), (7 / 12, "#2a78d6"),
     (8 / 12, "#256abf"), (9 / 12, "#1c5cab"), (10 / 12, "#184f95"), (11 / 12, "#104281"),
     (12 / 12, "#0d366b"),
 ]  # fmt: skip
+
+# Per-category sequential ramps for the Vital Conditions choropleth (HVC "Color Templates Based
+# on Aim 3 Hex Codes"), keyed by VitalCondition.key -- one hue family per framework category
+# instead of blue for everything. Only one metric/ramp is ever visible on the map at once (the
+# dropdown swaps traces), so this still respects the single-simultaneous-hue dataviz rule; it
+# just lets *which* hue family varies by category. Metrics with no category (condition="") fall
+# back to BLUE_SEQUENTIAL.
+CONDITION_RAMPS: dict[str, list[tuple[float, str]]] = {
+    "basic_needs":       [(0/4, "#bde1f9"), (1/4, "#a0d1f3"), (2/4, "#56b4e9"), (3/4, "#459fd3"), (4/4, "#338abd")],
+    "humane_housing":    [(0/4, "#f9f4bc"), (1/4, "#f0e442"), (2/4, "#d9c733"), (3/4, "#b8a022"), (4/4, "#967811")],
+    "work_wealth":       [(0/4, "#f2c1b4"), (1/4, "#e7a28c"), (2/4, "#d55e00"), (3/4, "#bd4a0a"), (4/4, "#a6350f")],
+    "lifelong_learning": [(0/4, "#fdebd5"), (1/4, "#f2c56b"), (2/4, "#e69f00"), (3/4, "#c47901"), (4/4, "#b86a00")],
+    "transportation":    [(0/4, "#badbdb"), (1/4, "#67b1b3"), (2/4, "#007e82"), (3/4, "#005a5e"), (4/4, "#003f43")],
+    "belonging":         [(0/4, "#ffe9f8"), (1/4, "#e6b1d0"), (2/4, "#cc79a7"), (3/4, "#a75684"), (4/4, "#813361")],
+}  # fmt: skip
 
 # First 7 categorical slots, fixed order, light mode -- validated all-hard-gates-pass
 # for a 7-series line chart (adjacent pairlist; "lines" per the skill's classification).
@@ -133,10 +149,11 @@ def build_choropleth(
         return z, text, widths, colors
 
     fig = go.Figure()
-    colorscale = [[t, hex_] for t, hex_ in BLUE_SEQUENTIAL]
 
     for i, metric in enumerate(metrics):
         z, text, widths, colors = _aligned(metric, initial_year)
+        ramp = CONDITION_RAMPS.get(metric.condition, BLUE_SEQUENTIAL)
+        colorscale = [[t, hex_] for t, hex_ in ramp]
         fig.add_trace(
             go.Choropleth(
                 geojson=geojson,

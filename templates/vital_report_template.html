@@ -3,36 +3,42 @@
 <head>
 <meta charset="utf-8">
 <title>Vital Conditions Report — ACS Data</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
   :root {
     color-scheme: light;
-    --surface-1:      #fcfcfb;
-    --page:           #f9f9f7;
-    --text-primary:   #0b0b0b;
-    --text-secondary: #52514e;
-    --text-muted:     #898781;
-    --gridline:       #e1e0d9;
-    --baseline:       #c3c2b7;
-    --series-1:       #2a78d6;
-    --series-2:       #8a8a86;
-    --border:         rgba(11,11,11,0.10);
-    --flag-good:      #0ca30c;
-    --flag-caution:   #fab219;
-    --flag-bad:       #d03b3b;
+    /* HVC Style Guide -- primary/secondary palette (May 2026) */
+    --surface-1:      #ffffff;  /* White */
+    --page:           #edf5fb;  /* Cloud */
+    --text-primary:   #13294b;  /* Navy */
+    --text-secondary: #5b6670;  /* Old Well Basin */
+    --text-muted:     #a2aaad;  /* Flat Gray */
+    --gridline:       #cfd3d5;  /* Cornerstone */
+    --baseline:       #a2aaad;  /* Flat Gray */
+    --series-1:       #4b9cd3;  /* Carolina Blue -- Veteran series */
+    --series-2:       #a2aaad;  /* Flat Gray -- Civilian series */
+    --border:         rgba(19,41,75,0.12);
+    --flag-good:      #006d6a;  /* Piedmont Pine */
+    --flag-caution:   #ff9e1b;  /* Tulip Poplar */
+    --flag-bad:       #e95550;  /* Clay */
   }
   @media (prefers-color-scheme: dark) {
     :root { color-scheme: dark;
-      --surface-1: #1a1a19; --page: #0d0d0d; --text-primary: #ffffff;
-      --text-secondary: #c3c2b7; --text-muted: #898781; --gridline: #2c2c2a;
-      --baseline: #383835; --series-1: #3987e5; --series-2: #98978f; --border: rgba(255,255,255,0.10);
+      --surface-1: #16233a; --page: #0d1420; --text-primary: #ffffff;
+      --text-secondary: #b7d7ed; --text-muted: #8a97a8; --gridline: #29354a;
+      --baseline: #3a4762; --series-1: #6cb2e0; --series-2: #a2aaad; --border: rgba(183,215,237,0.14);
+      --flag-good: #1fa39d; --flag-caution: #ffb545; --flag-bad: #f2726e;
     }
   }
   * { box-sizing: border-box; }
   body {
     margin: 0; padding: 2.5rem 1.25rem; background: var(--page); color: var(--text-primary);
-    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-family: "Open Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
   }
   main { max-width: 1040px; margin: 0 auto; }
+  h1, h2, h3 { font-family: "Libre Baskerville", Georgia, serif; }
   h1 { font-size: 1.5rem; margin: 0 0 0.25rem; }
   .subtitle { color: var(--text-secondary); margin: 0 0 2rem; font-size: 0.95rem; }
   .subtitle a { color: var(--series-1); text-decoration: none; }
@@ -287,11 +293,11 @@
   <section class="card">
     <h2>Veteran vs. civilian comparison ({{ map_year }})</h2>
     <p class="caption">
-      Focus counties. ACS only cross-tabulates a handful of things by veteran status: poverty, unemployment,
-      personal income, and educational attainment below, plus veteran-only service-connected disability rating.
+      Focus counties. ACS only cross-tabulates a handful of things by Veteran status: poverty, unemployment,
+      personal income, and educational attainment below, plus Veteran-only service-connected disability rating.
       It does <strong>not</strong> break out health insurance, housing cost burden, vehicle access, commute time,
-      or broadband access by veteran status -- those vital-conditions metrics above are population-wide only,
-      with no veteran-specific split available anywhere in ACS.
+      or broadband access by Veteran status -- those vital-conditions metrics above are population-wide only,
+      with no Veteran-specific split available anywhere in ACS.
     </p>
     {% for block in compare_focus %}
     <details class="compare-block" open>
@@ -372,8 +378,8 @@
   </section>
 
   <section class="card">
-    <h2>All counties — veteran vs. civilian ({{ map_year }})</h2>
-    <p class="caption">Every NC county, veteran and civilian side by side wherever ACS supports the split. Click a column header to sort; search to filter by county; hover a value for what it means.</p>
+    <h2>All counties — Veteran vs. civilian ({{ map_year }})</h2>
+    <p class="caption">Every NC county, Veteran and civilian side by side wherever ACS supports the split. Click a column header to sort; search to filter by county; hover a value for what it means.</p>
     <div class="table-controls">
       <input type="search" id="compare-search" placeholder="Search county…" aria-label="Search county">
       <span class="table-count" id="compare-count"></span>

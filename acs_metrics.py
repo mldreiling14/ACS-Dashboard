@@ -21,7 +21,7 @@ from acs_tables import (
     reliability_flag,
 )
 
-VETERAN_COUNT_LABEL = "Civilian veterans"
+VETERAN_COUNT_LABEL = "Civilian Veterans"
 
 
 @dataclass

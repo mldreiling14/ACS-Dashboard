@@ -214,13 +214,13 @@ class MapMetricSpec:
 
 MAP_METRICS: list[MapMetricSpec] = [
     MapMetricSpec("veteran_pct", "Veteran % (18+ population)", "DP02", "Blues", "percent"),
-    MapMetricSpec("veteran_poverty_rate", "Poverty rate among veterans", "C21007", "Oranges", "percent"),
+    MapMetricSpec("veteran_poverty_rate", "Poverty rate among Veterans", "C21007", "Oranges", "percent"),
     MapMetricSpec(
-        "disability_rating_pct", "% veterans with service-connected disability rating", "B21100", "Purples", "percent"
+        "disability_rating_pct", "% Veterans with service-connected disability rating", "B21100", "Purples", "percent"
     ),
     MapMetricSpec("va_healthcare_pct", "% population with VA health care coverage", "C27009", "Greens", "percent"),
     MapMetricSpec("veteran_unemployment_rate", "Veteran unemployment rate", "B21005", "Reds", "percent"),
-    MapMetricSpec("veteran_median_income", "Median income, veterans", "B21004", "Tealgrn", "currency"),
+    MapMetricSpec("veteran_median_income", "Median income, Veterans", "B21004", "Tealgrn", "currency"),
 ]
 
 # Full county-data-table metrics: veteran_count (raw estimate, not on the map/trend charts)
