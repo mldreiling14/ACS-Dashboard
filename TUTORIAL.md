@@ -15,6 +15,7 @@ census_dashboard/
 ├── acs_db.py                        # SQLite database (data/acs.db) built from acs_metrics
 ├── acs_figures.py                     # quick matplotlib bar/trend/map figures over acs_db
 ├── cli.py                               # command-line query/plot interface over acs_db
+├── app.py                                 # Streamlit GUI over acs_db/acs_figures
 ├── geo_map.py                             # NC county GeoJSON + the two Plotly figures (map, trend)
 ├── generate_report.py                       # orchestrates everything above into index.html
 ├── templates/
@@ -199,7 +200,29 @@ for others. Drop `--out` to pop up an interactive matplotlib window instead of s
 These are quick static PNGs (matplotlib) for exploration -- the interactive, year-slider
 Plotly map/trend charts embedded in `index.html` still come from `geo_map.py`.
 
-## 8. Adding another metric or another year
+## 8. The GUI — `app.py`
+
+The CLI and Python API above are the fastest way to pull a table or a chart, but
+they're typed commands, not something to click around in. `app.py` is a small
+Streamlit app that wraps `acs_db.py`/`acs_figures.py` in a local web page with
+dropdowns instead -- same data, same functions, just interactive.
+
+```powershell
+venv\Scripts\streamlit run app.py
+```
+
+Opens `http://localhost:8501` in your browser. Pick a metric and a view (table,
+bar chart, map, or a county's trend over time) from the sidebar; the page
+updates live. Every table has a "Download CSV" button, and there's a "Rebuild
+database" button in the sidebar so you never need to drop back to the CLI just
+to refresh the data.
+
+This is a local dev tool, not something deployed anywhere -- close the terminal
+and it stops running. It reads the same `data/acs.db` the CLI builds, so run
+`python cli.py build` (or the in-app rebuild button) at least once before
+`streamlit run app.py` if you haven't already.
+
+## 9. Adding another metric or another year
 
 - **Another table/metric**: add a `TableSpec` to `acs_tables.TABLES` (look up
   the exact variable codes at
@@ -219,7 +242,7 @@ Plotly map/trend charts embedded in `index.html` still come from `geo_map.py`.
   `NC_STATE_FIPS` in `acs_tables.py` and re-running `geo_map.get_nc_counties_geojson`
   with a new state filter (currently hardcoded to `"37"` too).
 
-## 9. Troubleshooting
+## 10. Troubleshooting
 
 **`ConnectionResetError [WinError 10054]` or SSL handshake failures.** Almost
 always local network interference (AV doing HTTPS inspection, a corporate
