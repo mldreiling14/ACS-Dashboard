@@ -114,6 +114,26 @@ def _geojson_bounds(geojson: dict) -> tuple[float, float, float, float]:
     return min_lon, max_lon, min_lat, max_lat
 
 
+def _county_boundary_lines(geojson: dict) -> tuple[list, list]:
+    """Every county polygon's ring coordinates, flattened into one lon/lat pair of lists with
+    `None` breaks between rings -- the standard way to draw a whole GeoJSON layer's borders as a
+    single Scattergeo line trace. Choropleth's own `marker.line` can only do solid borders (no
+    `dash` attribute), so this overlay trace is what actually draws the dashed county lines."""
+    lons: list = []
+    lats: list = []
+    for feature in geojson["features"]:
+        geometry = feature["geometry"]
+        polygons = geometry["coordinates"] if geometry["type"] == "MultiPolygon" else [geometry["coordinates"]]
+        for polygon in polygons:
+            for ring in polygon:
+                for lon, lat in ring:
+                    lons.append(lon)
+                    lats.append(lat)
+                lons.append(None)
+                lats.append(None)
+    return lons, lats
+
+
 def _format_value(value: float, value_format: str) -> str:
     if value_format == "currency":
         return f"${value:,.0f}"
@@ -170,6 +190,23 @@ def build_choropleth(
             )
         )
 
+    # Dashed county-border overlay, drawn once on top of every choropleth trace and always
+    # visible -- borders don't change per metric/year, so this one trace never needs updating.
+    # Added after the metric traces (a fixed extra index beyond them), so it's important that
+    # nothing below restyles/animates "all traces" without naming indices, or this would get
+    # swept up in a metric switch or year-frame update.
+    boundary_lons, boundary_lats = _county_boundary_lines(geojson)
+    fig.add_trace(
+        go.Scattergeo(
+            lon=boundary_lons,
+            lat=boundary_lats,
+            mode="lines",
+            line=dict(width=1.3, color="#4a4944", dash="dash"),
+            hoverinfo="skip",
+            showlegend=False,
+        )
+    )
+
     # One frame per year; each frame updates every metric trace's z/text/border so the year
     # slider works no matter which metric is currently visible.
     frames = []
@@ -184,11 +221,14 @@ def build_choropleth(
     # No in-figure title: the dropdown button itself already names the current metric, and a
     # second title layered above it fought the dropdown for the same slice of top margin and
     # ended up overlapping/obscured by it. One label instead of two overlapping ones.
+    # Trace indices are explicit here (not left to Plotly's "all traces" default) so this
+    # restyle only ever touches the metric choropleths -- the boundary overlay trace added
+    # above stays visible and untouched regardless of which metric is selected.
     metric_buttons = [
         dict(
             label=metric.label,
             method="update",
-            args=[{"visible": [j == i for j in range(len(metrics))]}],
+            args=[{"visible": [j == i for j in range(len(metrics))]}, list(range(len(metrics)))],
         )
         for i, metric in enumerate(metrics)
     ]
@@ -239,6 +279,7 @@ def build_choropleth(
         margin=dict(l=20, r=20, t=70, b=20),
         height=560,
         autosize=True,
+        dragmode=False,  # map stays fixed -- no click-drag panning (paired with STATIC_MAP_CONFIG's scrollZoom=False)
         font=dict(family="system-ui, -apple-system, 'Segoe UI', sans-serif", color="#0b0b0b"),
     )
     return fig
@@ -306,8 +347,15 @@ def build_trend_chart(
     return fig
 
 
-def render_html(fig: go.Figure, include_plotlyjs: str = "cdn") -> str:
-    return fig.to_html(full_html=False, include_plotlyjs=include_plotlyjs)
+# Pairs with build_choropleth's dragmode=False: scrollZoom/doubleClick are separate interaction
+# paths Plotly's geo subplots handle outside of dragmode, so both need disabling to make the
+# map fully fixed. displayModeBar=False also drops the (otherwise still-visible) zoom/pan
+# toolbar so there's no UI left suggesting the map can be moved.
+STATIC_MAP_CONFIG = {"scrollZoom": False, "displayModeBar": False, "doubleClick": False}
+
+
+def render_html(fig: go.Figure, include_plotlyjs: str = "cdn", config: dict | None = None) -> str:
+    return fig.to_html(full_html=False, include_plotlyjs=include_plotlyjs, config=config)
 
 
 if __name__ == "__main__":

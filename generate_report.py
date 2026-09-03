@@ -20,7 +20,7 @@ from jinja2 import Environment, FileSystemLoader
 
 from acs_metrics import build_county_summary, build_store, county_metrics_for
 from acs_tables import MAP_METRICS, YEARS
-from geo_map import build_choropleth, get_nc_counties_geojson, render_html
+from geo_map import STATIC_MAP_CONFIG, build_choropleth, get_nc_counties_geojson, render_html
 from vital_tables import COMPARE_METRICS, COMPARE_TABLES
 
 BASE_DIR = Path(__file__).parent
@@ -59,7 +59,7 @@ def build_report() -> None:
     # No focus-county subset any more -- every county gets the same map styling and the same
     # executive-summary page, so there's nothing to outline differently.
     map_fig = build_choropleth(geojson, MAP_METRICS, data_by_metric_year, set(), YEARS, map_year)
-    map_html = render_html(map_fig, include_plotlyjs="cdn")
+    map_html = render_html(map_fig, include_plotlyjs="cdn", config=STATIC_MAP_CONFIG)
 
     env = Environment(loader=FileSystemLoader(BASE_DIR / "templates"))
     env.filters["fmt"] = lambda value, value_format: (

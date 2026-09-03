@@ -31,6 +31,24 @@
   h1 { font-size: 1.5rem; margin: 0 0 0.25rem; }
   .subtitle { color: var(--text-secondary); margin: 0 0 1rem; font-size: 0.95rem; }
   .intro { color: var(--text-secondary); font-size: 0.95rem; line-height: 1.6; margin: 0 0 1.75rem; max-width: 720px; }
+
+  /* Tab navigation */
+  .tabs { margin-bottom: 1.5rem; }
+  .tablist {
+    display: flex; gap: 0.35rem; overflow-x: auto; border-bottom: 1px solid var(--border);
+    margin-bottom: 1.5rem;
+  }
+  .tab-btn {
+    appearance: none; border: none; background: none; cursor: pointer; white-space: nowrap;
+    font: inherit; font-size: 0.9rem; color: var(--text-secondary); padding: 0.65rem 1rem;
+    border-bottom: 2px solid transparent; margin-bottom: -1px; border-radius: 8px 8px 0 0;
+  }
+  .tab-btn:hover { color: var(--text-primary); background: var(--surface-1); }
+  .tab-btn.is-active { color: var(--series-1); border-bottom-color: var(--series-1); font-weight: 600; }
+  .tab-btn:focus-visible { outline: 2px solid var(--series-1); outline-offset: 2px; }
+  .tab-panel { display: none; }
+  .tab-panel.is-active { display: block; }
+
   .card {
     background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px;
     padding: 1.5rem; margin-bottom: 1.5rem;
@@ -62,8 +80,9 @@
   .county-jump button:hover { border-color: var(--series-1); color: var(--series-1); }
 
   /* Plotly figure renders as its own fixed-chrome widget (light surface, baked at
-     generation time) regardless of the page's light/dark mode -- see geo_map.py. */
-  .plotly-wrap { border-radius: 8px; overflow: hidden; cursor: pointer; }
+     generation time) regardless of the page's light/dark mode -- see geo_map.py. Map is
+     locked (dragmode off, scrollZoom off -- see STATIC_MAP_CONFIG), so no grab cursor. */
+  .plotly-wrap { border-radius: 8px; overflow: hidden; }
 
   /* "What this map shows" reference card */
   .metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1rem; }
@@ -85,44 +104,94 @@
     with the slider below the map, then open any county for its full executive summary.
   </p>
 
-  <section class="card">
-    <h2>County map</h2>
-    <p class="caption">All 100 NC counties · dropdown switches metric · slider below the map switches year</p>
-
-    <p class="click-hint"><span class="icon">🖱️</span> Click a county on the map to open its executive summary</p>
-
-    <div class="county-jump">
-      <label for="county-jump-input">Or jump straight to a county:</label>
-      <input type="text" id="county-jump-input" list="county-jump-list" placeholder="Start typing a county name…" autocomplete="off">
-      <datalist id="county-jump-list">
-        {% for link in county_links.values() | sort(attribute="name") %}
-        <option value="{{ link.name }}">
-        {% endfor %}
-      </datalist>
-      <button type="button" id="county-jump-go">Go</button>
+  <div class="tabs">
+    <div class="tablist" role="tablist" aria-label="Report view">
+      <button class="tab-btn is-active" role="tab" aria-selected="true" aria-controls="panel-map" id="tab-map" data-tab="map">🗺️ Map</button>
+      <button class="tab-btn" role="tab" aria-selected="false" aria-controls="panel-about" id="tab-about" data-tab="about">ℹ️ About this map</button>
     </div>
 
-    <div class="plotly-wrap" id="county-map-wrap">{{ map_html | safe }}</div>
-  </section>
+    <div class="tab-panel is-active" role="tabpanel" id="panel-map" aria-labelledby="tab-map">
+      <section class="card">
+        <h2>County map</h2>
+        <p class="caption">All 100 NC counties · dropdown switches metric · slider below the map switches year</p>
 
-  <section class="card">
-    <h2>What this map shows</h2>
-    <p class="caption">Six ACS 5-year Veteran metrics, {{ map_year }} · every county's executive summary also flags how it compares to the NC county average and to civilians in the same county</p>
-    <div class="metrics-grid">
-      {% for m in map_metrics %}
-      <div class="metric-item">
-        <h3>{{ m.label }}</h3>
-        <p>{{ metric_descriptions.get(m.key, "") }}</p>
-      </div>
-      {% endfor %}
+        <p class="click-hint"><span class="icon">🖱️</span> Click a county on the map to open its executive summary</p>
+
+        <div class="county-jump">
+          <label for="county-jump-input">Or jump straight to a county:</label>
+          <input type="text" id="county-jump-input" list="county-jump-list" placeholder="Start typing a county name…" autocomplete="off">
+          <datalist id="county-jump-list">
+            {% for link in county_links.values() | sort(attribute="name") %}
+            <option value="{{ link.name }}">
+            {% endfor %}
+          </datalist>
+          <button type="button" id="county-jump-go">Go</button>
+        </div>
+
+        <div class="plotly-wrap" id="county-map-wrap">{{ map_html | safe }}</div>
+      </section>
     </div>
-  </section>
+
+    <div class="tab-panel" role="tabpanel" id="panel-about" aria-labelledby="tab-about" hidden>
+      <section class="card">
+        <h2>What this map shows</h2>
+        <p class="caption">Six ACS 5-year Veteran metrics, {{ map_year }} · every county's executive summary also flags how it compares to the NC county average and to civilians in the same county</p>
+        <div class="metrics-grid">
+          {% for m in map_metrics %}
+          <div class="metric-item">
+            <h3>{{ m.label }}</h3>
+            <p>{{ metric_descriptions.get(m.key, "") }}</p>
+          </div>
+          {% endfor %}
+        </div>
+      </section>
+    </div>
+  </div>
 
   <footer>
     Built with the Census Data API and public ACS resources · <a href="https://www.census.gov/programs-surveys/acs/data.html" target="_blank" rel="noopener">census.gov/programs-surveys/acs/data.html</a>
   </footer>
 </main>
 <script>
+(function () {
+  // Tab navigation: switch panels, and force the Plotly figure to resize the first time its
+  // panel is shown -- it's laid out with display:none initially and Plotly never sees a resize
+  // event for that, so left alone it would render at zero width if its tab weren't the default.
+  var tabButtons = Array.prototype.slice.call(document.querySelectorAll('.tab-btn'));
+  var panels = {};
+  tabButtons.forEach(function (btn) {
+    panels[btn.getAttribute('data-tab')] = document.getElementById(btn.getAttribute('aria-controls'));
+  });
+  var resized = {};
+
+  function activate(name) {
+    tabButtons.forEach(function (btn) {
+      var active = btn.getAttribute('data-tab') === name;
+      btn.classList.toggle('is-active', active);
+      btn.setAttribute('aria-selected', active ? 'true' : 'false');
+    });
+    Object.keys(panels).forEach(function (key) {
+      var panel = panels[key];
+      var active = key === name;
+      panel.classList.toggle('is-active', active);
+      if (active) { panel.removeAttribute('hidden'); } else { panel.setAttribute('hidden', ''); }
+    });
+
+    if (!resized[name] && window.Plotly) {
+      var plots = panels[name].querySelectorAll('.js-plotly-plot');
+      Array.prototype.forEach.call(plots, function (p) { Plotly.Plots.resize(p); });
+      resized[name] = true;
+    }
+  }
+
+  tabButtons.forEach(function (btn) {
+    btn.addEventListener('click', function () { activate(btn.getAttribute('data-tab')); });
+  });
+
+  var hash = (location.hash || '').replace('#', '');
+  if (panels[hash]) activate(hash);
+})();
+
 (function () {
   var countyLinks = {{ county_links_json | safe }};
   var nameToSlug = {};
