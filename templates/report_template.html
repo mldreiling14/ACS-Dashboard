@@ -13,11 +13,13 @@
     --text-muted:     #898781;
     --border:         rgba(11,11,11,0.10);
     --series-1:       #2a78d6;
+    --accent-tint:    rgba(42,120,214,0.08);
   }
   @media (prefers-color-scheme: dark) {
     :root { color-scheme: dark;
       --surface-1: #1a1a19; --page: #0d0d0d; --text-primary: #ffffff;
       --text-secondary: #c3c2b7; --text-muted: #898781; --series-1: #3987e5; --border: rgba(255,255,255,0.10);
+      --accent-tint: rgba(57,135,229,0.14);
     }
   }
   * { box-sizing: border-box; }
@@ -27,17 +29,46 @@
   }
   main { max-width: 1040px; margin: 0 auto; }
   h1 { font-size: 1.5rem; margin: 0 0 0.25rem; }
-  .subtitle { color: var(--text-secondary); margin: 0 0 1.75rem; font-size: 0.95rem; }
+  .subtitle { color: var(--text-secondary); margin: 0 0 1rem; font-size: 0.95rem; }
+  .intro { color: var(--text-secondary); font-size: 0.95rem; line-height: 1.6; margin: 0 0 1.75rem; max-width: 720px; }
   .card {
     background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px;
     padding: 1.5rem; margin-bottom: 1.5rem;
   }
   .card h2 { font-size: 1.05rem; margin: 0 0 0.25rem; }
-  .card .caption { color: var(--text-secondary); font-size: 0.85rem; margin: 0 0 1.25rem; }
+  .card .caption { color: var(--text-secondary); font-size: 0.85rem; margin: 0 0 1rem; }
+
+  /* Standalone click-a-county callout -- its own line, its own visual weight, not buried in
+     the caption text. */
+  .click-hint {
+    display: flex; align-items: center; gap: 0.6rem; color: var(--series-1); font-size: 0.95rem;
+    font-weight: 600; background: var(--accent-tint); border-radius: 8px; padding: 0.65rem 0.9rem;
+    margin: 0 0 1.25rem;
+  }
+  .click-hint .icon { font-size: 1.1rem; line-height: 1; }
+
+  /* County quick-jump search -- a typed alternative to clicking a (sometimes tiny) map shape */
+  .county-jump { display: flex; align-items: center; gap: 0.6rem; margin: 0 0 1.25rem; flex-wrap: wrap; }
+  .county-jump label { font-size: 0.85rem; color: var(--text-secondary); }
+  .county-jump input {
+    flex: 0 1 260px; padding: 0.5rem 0.75rem; border-radius: 8px; border: 1px solid var(--border);
+    background: var(--page); color: var(--text-primary); font-size: 0.9rem;
+  }
+  .county-jump input:focus { outline: 2px solid var(--series-1); outline-offset: -1px; }
+  .county-jump button {
+    padding: 0.5rem 0.9rem; border-radius: 8px; border: 1px solid var(--border); background: var(--surface-1);
+    color: var(--text-primary); font-size: 0.85rem; cursor: pointer;
+  }
+  .county-jump button:hover { border-color: var(--series-1); color: var(--series-1); }
 
   /* Plotly figure renders as its own fixed-chrome widget (light surface, baked at
      generation time) regardless of the page's light/dark mode -- see geo_map.py. */
   .plotly-wrap { border-radius: 8px; overflow: hidden; cursor: pointer; }
+
+  /* "What this map shows" reference card */
+  .metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1rem; }
+  .metric-item h3 { font-size: 0.9rem; margin: 0 0 0.25rem; }
+  .metric-item p { color: var(--text-secondary); font-size: 0.85rem; line-height: 1.5; margin: 0; }
 
   footer { color: var(--text-muted); font-size: 0.78rem; text-align: center; margin-top: 2rem; }
   footer a { color: inherit; }
@@ -47,11 +78,44 @@
 <main>
   <h1>Veteran Vital Conditions — North Carolina</h1>
   <p class="subtitle">Generated {{ generated_at }} · Source: U.S. Census Bureau, ACS 5-Year Estimates ({{ years[0] }}–{{ years[-1] }}) · Map shown for {{ map_year }}</p>
+  <p class="intro">
+    This map tracks six Veteran-specific measures — population share, poverty, service-connected
+    disability rating, VA health care coverage, unemployment, and income — across all 100 North
+    Carolina counties, {{ years[0] }}–{{ years[-1] }}. Switch metrics with the dropdown and years
+    with the slider below the map, then open any county for its full executive summary.
+  </p>
 
   <section class="card">
     <h2>County map</h2>
-    <p class="caption">All 100 NC counties · dropdown switches metric · slider below the map switches year · <strong>click a county to open its executive summary</strong></p>
+    <p class="caption">All 100 NC counties · dropdown switches metric · slider below the map switches year</p>
+
+    <p class="click-hint"><span class="icon">🖱️</span> Click a county on the map to open its executive summary</p>
+
+    <div class="county-jump">
+      <label for="county-jump-input">Or jump straight to a county:</label>
+      <input type="text" id="county-jump-input" list="county-jump-list" placeholder="Start typing a county name…" autocomplete="off">
+      <datalist id="county-jump-list">
+        {% for link in county_links.values() | sort(attribute="name") %}
+        <option value="{{ link.name }}">
+        {% endfor %}
+      </datalist>
+      <button type="button" id="county-jump-go">Go</button>
+    </div>
+
     <div class="plotly-wrap" id="county-map-wrap">{{ map_html | safe }}</div>
+  </section>
+
+  <section class="card">
+    <h2>What this map shows</h2>
+    <p class="caption">Six ACS 5-year Veteran metrics, {{ map_year }} · every county's executive summary also flags how it compares to the NC county average and to civilians in the same county</p>
+    <div class="metrics-grid">
+      {% for m in map_metrics %}
+      <div class="metric-item">
+        <h3>{{ m.label }}</h3>
+        <p>{{ metric_descriptions.get(m.key, "") }}</p>
+      </div>
+      {% endfor %}
+    </div>
   </section>
 
   <footer>
@@ -60,20 +124,37 @@
 </main>
 <script>
 (function () {
+  var countyLinks = {{ county_links_json | safe }};
+  var nameToSlug = {};
+  Object.keys(countyLinks).forEach(function (fips) {
+    nameToSlug[countyLinks[fips].name] = countyLinks[fips].slug;
+  });
+
   // Clicking a county shape on the choropleth opens that county's executive-summary page.
   // `event.points[0].location` is the fips id Plotly used for `locations` on every trace
   // (see geo_map.py's `canonical_fips`), regardless of which metric trace is currently visible.
   var wrap = document.getElementById('county-map-wrap');
-  var countyLinks = {{ county_links_json | safe }};
-  if (!wrap) return;
-  var plot = wrap.querySelector('.js-plotly-plot');
-  if (!plot || !window.Plotly) return;
-  plot.on('plotly_click', function (event) {
-    var point = event.points && event.points[0];
-    var fips = point && point.location;
-    var link = fips && countyLinks[fips];
-    if (link) window.location.href = 'counties/' + link.slug + '.html';
-  });
+  var plot = wrap && wrap.querySelector('.js-plotly-plot');
+  if (plot && window.Plotly) {
+    plot.on('plotly_click', function (event) {
+      var point = event.points && event.points[0];
+      var fips = point && point.location;
+      var link = fips && countyLinks[fips];
+      if (link) window.location.href = 'counties/' + link.slug + '.html';
+    });
+  }
+
+  // County quick-jump: typed name (matched against the datalist) -> that county's page.
+  var jumpInput = document.getElementById('county-jump-input');
+  var jumpButton = document.getElementById('county-jump-go');
+  function goToTypedCounty() {
+    var slug = nameToSlug[jumpInput.value.trim()];
+    if (slug) window.location.href = 'counties/' + slug + '.html';
+  }
+  if (jumpInput && jumpButton) {
+    jumpButton.addEventListener('click', goToTypedCounty);
+    jumpInput.addEventListener('keydown', function (e) { if (e.key === 'Enter') goToTypedCounty(); });
+  }
 })();
 </script>
 </body>

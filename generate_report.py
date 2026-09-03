@@ -27,6 +27,18 @@ BASE_DIR = Path(__file__).parent
 OUTPUT_PATH = BASE_DIR / "index.html"
 COUNTIES_DIR = BASE_DIR / "counties"
 
+# One-line plain-language descriptions for the "What this map shows" reference card --
+# MAP_METRICS itself carries no prose, just the id/label/table/color/format/direction needed
+# to fetch and render each metric.
+METRIC_DESCRIPTIONS: dict[str, str] = {
+    "veteran_pct": "Share of the 18+ population who are Veterans.",
+    "veteran_poverty_rate": "Share of Veterans living below the poverty line.",
+    "disability_rating_pct": "Share of Veterans with a VA-recognized service-connected disability rating.",
+    "va_healthcare_pct": "Share of the total population covered by VA health care (not Veterans-only).",
+    "veteran_unemployment_rate": "Share of Veterans in the labor force who are unemployed.",
+    "veteran_median_income": "Median personal income among Veterans.",
+}
+
 
 def _resolve_map_year(store) -> int:
     """Latest year where every map metric has data -- keeps every dropdown option non-empty."""
@@ -77,6 +89,9 @@ def build_report() -> None:
         map_year=map_year,
         years=YEARS,
         map_html=map_html,
+        map_metrics=MAP_METRICS,
+        metric_descriptions=METRIC_DESCRIPTIONS,
+        county_links=county_links,
         county_links_json=json.dumps(county_links),
     )
 
