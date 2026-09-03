@@ -1,9 +1,11 @@
 """
 Orchestrates the whole pipeline: fetch real veteran-related ACS estimates (6
 tables x 2015-2024 x all 100 NC counties) via acs_fetch/acs_metrics, build the
-choropleth Plotly figure via geo_map, and render a single static index.html --
-a statewide map that clicks through to a per-county executive-summary page
-(counties/<slug>.html, one per county, generated in the same pass).
+choropleth/trend/bar Plotly figures via geo_map, and render a single static
+index.html -- a statewide map (Map tab) plus statewide trend/ranked-bar charts
+and a full data table (Chart/Table tabs) that clicks through to a per-county
+executive-summary page (counties/<slug>.html, one per county, generated in the
+same pass).
 
 Usage:
     venv/Scripts/python.exe generate_report.py
@@ -18,9 +20,16 @@ from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader
 
-from acs_metrics import build_county_summary, build_store, county_metrics_for
-from acs_tables import MAP_METRICS, YEARS
-from geo_map import STATIC_MAP_CONFIG, build_choropleth, get_nc_counties_geojson, render_html
+from acs_metrics import all_counties_table, build_county_summary, build_store, county_metrics_for, peer_average, trend_series
+from acs_tables import ALL_TABLE_METRICS, MAP_METRICS, YEARS
+from geo_map import (
+    STATIC_MAP_CONFIG,
+    build_bar_chart,
+    build_choropleth,
+    build_statewide_trend_chart,
+    get_nc_counties_geojson,
+    render_html,
+)
 from vital_tables import COMPARE_METRICS, COMPARE_TABLES
 
 BASE_DIR = Path(__file__).parent
@@ -48,6 +57,14 @@ def _resolve_map_year(store) -> int:
     return min(per_metric_latest)
 
 
+def _top_counties(store, metric_key: str, year: int, n: int = 7) -> list[tuple[str, str]]:
+    """That metric's own top-`n` counties by value at `year`, descending -- not a fixed
+    cross-metric subset, so a metric like poverty rate surfaces its own highest counties rather
+    than whichever 7 happen to be "focus counties" for an unrelated reason."""
+    rows = sorted(county_metrics_for(store, metric_key, year), key=lambda r: r.value, reverse=True)[:n]
+    return [(r.county_name, r.fips) for r in rows]
+
+
 def build_report() -> None:
     store = build_store()
     compare_store = build_store(tables=COMPARE_TABLES)
@@ -60,6 +77,24 @@ def build_report() -> None:
     # executive-summary page, so there's nothing to outline differently.
     map_fig = build_choropleth(geojson, MAP_METRICS, data_by_metric_year, set(), YEARS, map_year)
     map_html = render_html(map_fig, include_plotlyjs="cdn", config=STATIC_MAP_CONFIG)
+
+    # Chart tab: each metric's own top-7 counties (not a fixed subset) plus an NC-average
+    # reference line for the trend view, and a top-20 ranked bar view for the map's snapshot year.
+    top_counties_by_metric = {m.key: _top_counties(store, m.key, map_year) for m in MAP_METRICS}
+    trend_series_by_metric_fips = {
+        m.key: {fips: trend_series(store, m.key, fips) for _, fips in top_counties_by_metric[m.key]} for m in MAP_METRICS
+    }
+    nc_average_by_metric = {
+        m.key: [(y, avg[0]) for y in YEARS if (avg := peer_average(store, m.key, y)) is not None] for m in MAP_METRICS
+    }
+    trend_fig = build_statewide_trend_chart(MAP_METRICS, top_counties_by_metric, trend_series_by_metric_fips, nc_average_by_metric)
+    trend_html = render_html(trend_fig, include_plotlyjs=False)  # plotly.js already loaded by the map
+
+    bar_fig = build_bar_chart(MAP_METRICS, {m.key: data_by_metric_year[m.key][map_year] for m in MAP_METRICS}, top_n=20)
+    bar_html = render_html(bar_fig, include_plotlyjs=False)
+
+    # Table tab: every county, every metric, snapshot at map_year.
+    all_counties = all_counties_table(store, map_year, ALL_TABLE_METRICS)
 
     env = Environment(loader=FileSystemLoader(BASE_DIR / "templates"))
     env.filters["fmt"] = lambda value, value_format: (
@@ -89,8 +124,12 @@ def build_report() -> None:
         map_year=map_year,
         years=YEARS,
         map_html=map_html,
+        trend_html=trend_html,
+        bar_html=bar_html,
         map_metrics=MAP_METRICS,
         metric_descriptions=METRIC_DESCRIPTIONS,
+        all_counties=all_counties,
+        all_metrics=ALL_TABLE_METRICS,
         county_links=county_links,
         county_links_json=json.dumps(county_links),
     )

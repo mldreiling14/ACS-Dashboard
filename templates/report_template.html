@@ -11,14 +11,19 @@
     --text-primary:   #0b0b0b;
     --text-secondary: #52514e;
     --text-muted:     #898781;
+    --gridline:       #e1e0d9;
     --border:         rgba(11,11,11,0.10);
     --series-1:       #2a78d6;
     --accent-tint:    rgba(42,120,214,0.08);
+    --flag-good:      #0ca30c;
+    --flag-caution:   #fab219;
+    --flag-bad:       #d03b3b;
   }
   @media (prefers-color-scheme: dark) {
     :root { color-scheme: dark;
       --surface-1: #1a1a19; --page: #0d0d0d; --text-primary: #ffffff;
-      --text-secondary: #c3c2b7; --text-muted: #898781; --series-1: #3987e5; --border: rgba(255,255,255,0.10);
+      --text-secondary: #c3c2b7; --text-muted: #898781; --gridline: #2c2c2a;
+      --series-1: #3987e5; --border: rgba(255,255,255,0.10);
       --accent-tint: rgba(57,135,229,0.14);
     }
   }
@@ -79,15 +84,42 @@
   }
   .county-jump button:hover { border-color: var(--series-1); color: var(--series-1); }
 
-  /* Plotly figure renders as its own fixed-chrome widget (light surface, baked at
+  /* Plotly figures render as their own fixed-chrome widget (light surface, baked at
      generation time) regardless of the page's light/dark mode -- see geo_map.py. Map is
-     locked (dragmode off, scrollZoom off -- see STATIC_MAP_CONFIG), so no grab cursor. */
+     locked (dragmode off, scrollZoom off -- see STATIC_MAP_CONFIG), so no grab cursor there. */
   .plotly-wrap { border-radius: 8px; overflow: hidden; }
 
   /* "What this map shows" reference card */
   .metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1rem; }
   .metric-item h3 { font-size: 0.9rem; margin: 0 0 0.25rem; }
   .metric-item p { color: var(--text-secondary); font-size: 0.85rem; line-height: 1.5; margin: 0; }
+
+  /* All-counties explorer table */
+  .table-controls { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 0.9rem; }
+  .table-controls input[type="search"] {
+    flex: 0 1 260px; padding: 0.45rem 0.7rem; border-radius: 8px; border: 1px solid var(--border);
+    background: var(--page); color: var(--text-primary); font-size: 0.85rem;
+  }
+  .table-controls input[type="search"]:focus { outline: 2px solid var(--series-1); outline-offset: -1px; }
+  .table-count { color: var(--text-muted); font-size: 0.8rem; white-space: nowrap; }
+  .table-scroll { overflow-x: auto; }
+  table.data-table { width: 100%; min-width: 760px; border-collapse: collapse; font-size: 0.85rem; }
+  table.data-table th, table.data-table td { text-align: left; padding: 0.4rem 0.6rem; border-bottom: 1px solid var(--gridline); }
+  table.data-table th { color: var(--text-muted); font-weight: 600; }
+  table.data-table td:last-child, table.data-table th:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+  table.data-table th[data-sort] { cursor: pointer; user-select: none; white-space: nowrap; }
+  table.data-table th[data-sort]:hover { color: var(--text-primary); }
+  table.data-table th[data-sort]::after { content: "↕"; color: var(--text-muted); font-size: 0.75em; margin-left: 0.3em; }
+  table.data-table th[data-sort].sort-asc::after { content: "↑"; color: var(--series-1); }
+  table.data-table th[data-sort].sort-desc::after { content: "↓"; color: var(--series-1); }
+  table.data-table tbody tr.is-hidden { display: none; }
+  table.data-table .metric-value { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  table.data-table .metric-value .moe { color: var(--text-muted); font-size: 0.75rem; }
+  table.data-table .metric-value.muted { color: var(--text-muted); font-style: italic; }
+  .rel-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-left: 0.4em; vertical-align: middle; }
+  .rel-dot.reliable   { background: var(--flag-good); }
+  .rel-dot.caution    { background: var(--flag-caution); }
+  .rel-dot.unreliable { background: var(--flag-bad); }
 
   footer { color: var(--text-muted); font-size: 0.78rem; text-align: center; margin-top: 2rem; }
   footer a { color: inherit; }
@@ -98,15 +130,17 @@
   <h1>Veteran Vital Conditions — North Carolina</h1>
   <p class="subtitle">Generated {{ generated_at }} · Source: U.S. Census Bureau, ACS 5-Year Estimates ({{ years[0] }}–{{ years[-1] }}) · Map shown for {{ map_year }}</p>
   <p class="intro">
-    This map tracks six Veteran-specific measures — population share, poverty, service-connected
+    This site tracks six Veteran-specific measures — population share, poverty, service-connected
     disability rating, VA health care coverage, unemployment, and income — across all 100 North
-    Carolina counties, {{ years[0] }}–{{ years[-1] }}. Switch metrics with the dropdown and years
-    with the slider below the map, then open any county for its full executive summary.
+    Carolina counties, {{ years[0] }}–{{ years[-1] }}. Switch metrics with each dropdown and years
+    with the map's slider, then open any county for its full executive summary.
   </p>
 
   <div class="tabs">
     <div class="tablist" role="tablist" aria-label="Report view">
       <button class="tab-btn is-active" role="tab" aria-selected="true" aria-controls="panel-map" id="tab-map" data-tab="map">🗺️ Map</button>
+      <button class="tab-btn" role="tab" aria-selected="false" aria-controls="panel-chart" id="tab-chart" data-tab="chart">📊 Chart</button>
+      <button class="tab-btn" role="tab" aria-selected="false" aria-controls="panel-table" id="tab-table" data-tab="table">📋 Table</button>
       <button class="tab-btn" role="tab" aria-selected="false" aria-controls="panel-about" id="tab-about" data-tab="about">ℹ️ About this map</button>
     </div>
 
@@ -132,6 +166,60 @@
       </section>
     </div>
 
+    <div class="tab-panel" role="tabpanel" id="panel-chart" aria-labelledby="tab-chart" hidden>
+      <section class="card">
+        <h2>Trend over time</h2>
+        <p class="caption">Each metric's own top 7 counties, plus the NC county average · {{ years[0] }}–{{ years[-1] }} · dropdown switches metric · drag the bar below the chart to zoom into a year range</p>
+        <div class="plotly-wrap">{{ trend_html | safe }}</div>
+      </section>
+
+      <section class="card">
+        <h2>Counties ranked</h2>
+        <p class="caption">Top 20 counties by the selected metric, {{ map_year }} · dropdown switches metric</p>
+        <div class="plotly-wrap">{{ bar_html | safe }}</div>
+      </section>
+    </div>
+
+    <div class="tab-panel" role="tabpanel" id="panel-table" aria-labelledby="tab-table" hidden>
+      <section class="card">
+        <h2>All counties — full data ({{ map_year }})</h2>
+        <p class="caption">Every NC county tracked, every metric, with margin of error and reliability. Click a column header to sort; search to filter by county; click a county name for its full executive summary.</p>
+        <div class="table-controls">
+          <input type="search" id="county-search" placeholder="Search county…" aria-label="Search county">
+          <span class="table-count" id="county-count"></span>
+        </div>
+        <div class="table-scroll">
+          <table class="data-table" id="all-counties-table">
+            <thead>
+              <tr>
+                <th data-sort="string">County</th>
+                {% for m in all_metrics %}
+                <th data-sort="number">{{ m.label }}</th>
+                {% endfor %}
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in all_counties %}
+              <tr>
+                <td data-value="{{ row.name }}"><a href="counties/{{ county_links[row.fips].slug }}.html" style="color:var(--series-1);text-decoration:none;">{{ row.name }}</a></td>
+                {% for m in all_metrics %}
+                {% set cm = row.metrics[m.key] %}
+                {% if cm %}
+                <td class="metric-value" data-value="{{ cm.value }}">
+                  {{ cm.value | fmt(m.value_format) }} <span class="moe">±{{ cm.moe | fmt(m.value_format) }}</span><span class="rel-dot {{ cm.reliability }}" title="{{ cm.reliability }} (CV: {{ '%.1f'|format(cm.cv) if cm.cv is not none else 'n/a' }}%)"></span>
+                </td>
+                {% else %}
+                <td class="metric-value muted" data-value="-1">no data</td>
+                {% endif %}
+                {% endfor %}
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+
     <div class="tab-panel" role="tabpanel" id="panel-about" aria-labelledby="tab-about" hidden>
       <section class="card">
         <h2>What this map shows</h2>
@@ -154,9 +242,9 @@
 </main>
 <script>
 (function () {
-  // Tab navigation: switch panels, and force the Plotly figure to resize the first time its
-  // panel is shown -- it's laid out with display:none initially and Plotly never sees a resize
-  // event for that, so left alone it would render at zero width if its tab weren't the default.
+  // Tab navigation: switch panels, and force any Plotly figure inside a panel to resize the
+  // first time it's shown -- it's laid out with display:none initially and Plotly never sees a
+  // resize event for that, so left alone it would render at zero width outside the default tab.
   var tabButtons = Array.prototype.slice.call(document.querySelectorAll('.tab-btn'));
   var panels = {};
   tabButtons.forEach(function (btn) {
@@ -224,6 +312,49 @@
     jumpButton.addEventListener('click', goToTypedCounty);
     jumpInput.addEventListener('keydown', function (e) { if (e.key === 'Enter') goToTypedCounty(); });
   }
+})();
+
+(function () {
+  var table = document.getElementById('all-counties-table');
+  if (!table) return;
+  var tbody = table.tBodies[0];
+  var headers = table.tHead.rows[0].cells;
+  var rows = Array.prototype.slice.call(tbody.rows);
+
+  function updateCount() {
+    var visible = rows.filter(function (r) { return !r.classList.contains('is-hidden'); }).length;
+    document.getElementById('county-count').textContent = visible + ' of ' + rows.length + ' counties';
+  }
+
+  Array.prototype.forEach.call(headers, function (th, colIndex) {
+    var sortType = th.getAttribute('data-sort');
+    if (!sortType) return;
+    th.addEventListener('click', function () {
+      var asc = !th.classList.contains('sort-asc');
+      Array.prototype.forEach.call(headers, function (h) { h.classList.remove('sort-asc', 'sort-desc'); });
+      th.classList.add(asc ? 'sort-asc' : 'sort-desc');
+
+      rows.sort(function (a, b) {
+        var av = a.cells[colIndex].getAttribute('data-value');
+        var bv = b.cells[colIndex].getAttribute('data-value');
+        var cmp = sortType === 'number' ? (parseFloat(av) - parseFloat(bv)) : av.localeCompare(bv);
+        return asc ? cmp : -cmp;
+      });
+      rows.forEach(function (r) { tbody.appendChild(r); });
+    });
+  });
+
+  var search = document.getElementById('county-search');
+  search.addEventListener('input', function () {
+    var q = search.value.trim().toLowerCase();
+    rows.forEach(function (r) {
+      var name = r.cells[0].getAttribute('data-value').toLowerCase();
+      r.classList.toggle('is-hidden', q.length > 0 && name.indexOf(q) === -1);
+    });
+    updateCount();
+  });
+
+  updateCount();
 })();
 </script>
 </body>

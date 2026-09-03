@@ -1,7 +1,11 @@
 """
-Builds the two Plotly figures in the report: an NC county choropleth (one
-metric visible at a time, switched via dropdown) and a multi-year trend line
-chart for the 7 focus counties (same dropdown pattern).
+Builds the Plotly figures used across both reports: an NC county choropleth
+(one metric visible at a time, switched via dropdown), a multi-year trend
+line chart, and a ranked horizontal bar chart (same dropdown pattern). The
+trend/bar builders come in two flavors: a fixed-county-subset version
+(build_trend_chart, used by the Vital Conditions report's 7 focus counties)
+and a statewide version (build_statewide_trend_chart/build_bar_chart, used
+by the veteran report: each metric's own top counties, not a fixed subset).
 
 Colors follow the dataviz skill's validated default palette (references/palette.md):
 - Choropleth uses the documented single-hue BLUE sequential ramp for every metric,
@@ -342,6 +346,149 @@ def build_trend_chart(
             rangeslider=dict(visible=True, thickness=0.06, bgcolor=SURFACE, bordercolor="#e1e0d9", borderwidth=1),
         ),
         yaxis=dict(gridcolor="#e1e0d9", ticksuffix="%" if metrics[0].value_format == "percent" else ""),
+        font=dict(family="system-ui, -apple-system, 'Segoe UI', sans-serif", color="#0b0b0b"),
+    )
+    return fig
+
+
+NC_AVERAGE_COLOR = "#9c9a93"  # same light-gray family as the map's county borders
+
+
+def build_statewide_trend_chart(
+    metrics: list[MapMetricSpec],
+    top_counties_by_metric: dict[str, list[tuple[str, str]]],  # metric_key -> [(county_name, fips), ...]
+    series_by_metric_fips: dict[str, dict[str, list[CountyMetric]]],  # metric_key -> fips -> [CountyMetric per year]
+    nc_average_by_metric: dict[str, list[tuple[int, float]]],  # metric_key -> [(year, avg_value), ...]
+) -> go.Figure:
+    """Multi-year trend, one dropdown-switched view per metric: that metric's own top-7 counties
+    (highest value, not a fixed cross-metric subset -- each metric can highlight a different 7)
+    plus a dashed "NC county average" reference line. Same dropdown/rangeslider pattern as
+    build_trend_chart, generalized to a variable number of lines per metric."""
+    fig = go.Figure()
+    trace_metric_idx: list[int] = []  # which metric (by index) each trace belongs to, in add order
+
+    for i, metric in enumerate(metrics):
+        fips_series = series_by_metric_fips.get(metric.key, {})
+        for j, (county_name, fips) in enumerate(top_counties_by_metric.get(metric.key, [])):
+            points = fips_series.get(fips, [])
+            fig.add_trace(
+                go.Scatter(
+                    x=[p.year for p in points],
+                    y=[p.value for p in points],
+                    mode="lines+markers",
+                    name=county_name,
+                    line=dict(color=FOCUS_COUNTY_COLORS[j % len(FOCUS_COUNTY_COLORS)], width=2),
+                    marker=dict(size=6),
+                    visible=(i == 0),
+                    hovertemplate=f"<b>{county_name}</b><br>%{{x}}: {{y}}<extra></extra>".replace(
+                        "{y}", "%{y:.1f}" if metric.value_format == "percent" else "%{y:$,.0f}"
+                    ),
+                    legendgroup=f"{metric.key}-{county_name}",
+                )
+            )
+            trace_metric_idx.append(i)
+
+        avg_series = nc_average_by_metric.get(metric.key, [])
+        fig.add_trace(
+            go.Scatter(
+                x=[year for year, _ in avg_series],
+                y=[value for _, value in avg_series],
+                mode="lines",
+                name="NC county average",
+                line=dict(color=NC_AVERAGE_COLOR, width=2, dash="dash"),
+                visible=(i == 0),
+                hovertemplate="<b>NC county average</b><br>%{x}: %{y:.1f}<extra></extra>"
+                if metric.value_format == "percent"
+                else "<b>NC county average</b><br>%{x}: %{y:$,.0f}<extra></extra>",
+                legendgroup=f"{metric.key}-avg",
+            )
+        )
+        trace_metric_idx.append(i)
+
+    # No in-figure title -- see the matching note in build_choropleth; the dropdown already
+    # names the current metric.
+    buttons = [
+        dict(
+            label=metric.label,
+            method="update",
+            args=[
+                {"visible": [idx == i for idx in trace_metric_idx]},
+                {"yaxis.ticksuffix": "%" if metric.value_format == "percent" else ""},
+            ],
+        )
+        for i, metric in enumerate(metrics)
+    ]
+
+    fig.update_layout(
+        updatemenus=[dict(buttons=buttons, direction="down", x=0.02, y=1.18, xanchor="left")],
+        paper_bgcolor=SURFACE,
+        plot_bgcolor=SURFACE,
+        margin=dict(l=60, r=40, t=70, b=210),
+        height=480,
+        # up to 8 series (7 counties + NC average) wrap to 2-3 legend rows -- pushed well below
+        # the rangeslider (not just below the x-axis) so a wrapped row doesn't land on the slider.
+        legend=dict(orientation="h", y=-0.62),
+        xaxis=dict(
+            dtick=1,
+            gridcolor="#e1e0d9",
+            rangeslider=dict(visible=True, thickness=0.06, bgcolor=SURFACE, bordercolor="#e1e0d9", borderwidth=1),
+        ),
+        yaxis=dict(gridcolor="#e1e0d9", ticksuffix="%" if metrics[0].value_format == "percent" else ""),
+        font=dict(family="system-ui, -apple-system, 'Segoe UI', sans-serif", color="#0b0b0b"),
+    )
+    return fig
+
+
+def build_bar_chart(
+    metrics: list[MapMetricSpec],
+    data_by_metric: dict[str, list[CountyMetric]],  # metric_key -> [CountyMetric] for one snapshot year
+    top_n: int = 20,
+) -> go.Figure:
+    """Horizontal ranked-bar view, one dropdown-switched view per metric: the top `top_n`
+    counties by that metric's value, for the map's snapshot year."""
+    fig = go.Figure()
+
+    for i, metric in enumerate(metrics):
+        rows = sorted(data_by_metric.get(metric.key, []), key=lambda r: r.value, reverse=True)[:top_n]
+        rows.reverse()  # horizontal bars read top-to-bottom, so reverse puts the highest value on top
+        fig.add_trace(
+            go.Bar(
+                x=[r.value for r in rows],
+                y=[r.county_name for r in rows],
+                orientation="h",
+                marker_color="#2a78d6",
+                text=[_format_value(r.value, metric.value_format) for r in rows],
+                textposition="outside",
+                hovertext=[
+                    f"<b>{r.county_name}</b><br>{_format_value(r.value, metric.value_format)} "
+                    f"± {_format_value(r.moe, metric.value_format)} ({r.reliability})"
+                    for r in rows
+                ],
+                hoverinfo="text",
+                visible=(i == 0),
+            )
+        )
+
+    buttons = [
+        dict(
+            label=metric.label,
+            method="update",
+            args=[
+                {"visible": [j == i for j in range(len(metrics))]},
+                {"xaxis.ticksuffix": "%" if metric.value_format == "percent" else ""},
+            ],
+        )
+        for i, metric in enumerate(metrics)
+    ]
+
+    fig.update_layout(
+        updatemenus=[dict(buttons=buttons, direction="down", x=0.02, y=1.1, xanchor="left")],
+        paper_bgcolor=SURFACE,
+        plot_bgcolor=SURFACE,
+        margin=dict(l=140, r=60, t=60, b=40),
+        height=max(420, 26 * top_n + 100),
+        xaxis=dict(gridcolor="#e1e0d9", ticksuffix="%" if metrics[0].value_format == "percent" else ""),
+        yaxis=dict(automargin=True),
         font=dict(family="system-ui, -apple-system, 'Segoe UI', sans-serif", color="#0b0b0b"),
     )
     return fig
