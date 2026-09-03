@@ -38,22 +38,12 @@ with st.sidebar:
     st.header("Filters")
     metric_label = st.selectbox("Metric", list(metric_options))
     metric_key = metric_options[metric_label]
-    view = st.radio(
-        "View",
-        ["Table (one year, all counties)", "Bar chart (one year)", "Map (one year)", "Trend (one county, all years)"],
-    )
 
     years = acs_db.sql("SELECT DISTINCT year FROM metrics WHERE metric_key = ? ORDER BY year", (metric_key,))[
         "year"
     ].tolist()
-
-    year = None
-    county = None
-    if view != "Trend (one county, all years)":
-        year = st.select_slider("Year", options=years, value=years[-1])
-    else:
-        default_idx = county_names.index("Durham County") if "Durham County" in county_names else 0
-        county = st.selectbox("County", county_names, index=default_idx)
+    year = st.select_slider("Year", options=years, value=years[-1])
+    st.caption("Applies to the Table, Chart, and Map tabs. Trend always shows every year.")
 
     st.divider()
     if st.button("Rebuild database (refresh from Census API)"):
@@ -62,29 +52,34 @@ with st.sidebar:
         st.rerun()
 
 table_id = metrics_df.loc[metrics_df.metric_key == metric_key, "table_id"].iloc[0]
+st.subheader(metric_label)
 st.caption(f"Source table: ACS 5-year estimates, table {table_id}")
 
-if view == "Table (one year, all counties)":
+tab_table, tab_chart, tab_map, tab_trend = st.tabs(["📋 Table", "📊 Chart", "🗺️ Map", "📈 Trend"])
+
+with tab_table:
     df = acs_db.query_metric(metric_key, year=year)
-    st.subheader(f"{metric_label} — {year}")
+    st.caption(f"All 100 NC counties, {year}")
     display = df[["county_name", "value", "moe", "reliability"]].sort_values("value", ascending=False)
     st.dataframe(display, width="stretch", hide_index=True)
     st.download_button("Download CSV", df.to_csv(index=False), file_name=f"{metric_key}_{year}.csv")
 
-elif view == "Bar chart (one year)":
-    st.subheader(f"{metric_label} — {year}")
+with tab_chart:
+    st.caption(f"Counties ranked by value, {year}")
     top_n = st.slider("Counties shown", min_value=5, max_value=100, value=15)
     fig = acs_figures.bar_chart(metric_key, year, top_n=top_n)
     st.pyplot(fig)
 
-elif view == "Map (one year)":
-    st.subheader(f"{metric_label} — {year}")
+with tab_map:
+    st.caption(f"Choropleth across NC counties, {year}")
     fig = acs_figures.map_figure(metric_key, year)
     st.pyplot(fig)
 
-elif view == "Trend (one county, all years)":
+with tab_trend:
+    default_idx = county_names.index("Durham County") if "Durham County" in county_names else 0
+    county = st.selectbox("County", county_names, index=default_idx)
     df = acs_db.trend(metric_key, county)
-    st.subheader(f"{metric_label} — {county}")
+    st.caption(f"{county}, all available years")
     st.line_chart(df.set_index("year")["value"])
     st.dataframe(df[["year", "value", "moe", "reliability"]], width="stretch", hide_index=True)
     st.download_button("Download CSV", df.to_csv(index=False), file_name=f"{metric_key}_{county}.csv")
