@@ -11,9 +11,7 @@ from dataclasses import dataclass
 
 from acs_fetch import get_all
 from acs_tables import (
-    FOCUS_COUNTY_FIPS,
     MAP_METRICS,
-    NC_STATE_FIPS,
     TABLES,
     YEARS,
     MapMetricSpec,
@@ -22,8 +20,6 @@ from acs_tables import (
     moe_sum,
     reliability_flag,
 )
-
-VETERAN_COUNT_LABEL = "Civilian Veterans"
 
 # Plain-language reliability explanations, shown as hover/detail text next to every reliability
 # badge -- the CV-based reliable/caution/unreliable flags mean nothing to a reader who isn't a
@@ -116,16 +112,6 @@ def focus_county_card(
     store: MetricsStore, fips: str, year: int, metrics: list[MapMetricSpec] = MAP_METRICS
 ) -> dict[str, CountyMetric | None]:
     return {metric.key: store.by_metric.get(metric.key, {}).get(year, {}).get(fips) for metric in metrics}
-
-
-def focus_county_bar_rows(store: MetricsStore, year: int) -> list[CountyMetric]:
-    """Veteran-count rows for the 7 focus counties, sorted descending -- feeds the existing bar chart."""
-    rows = []
-    for county_fips in FOCUS_COUNTY_FIPS.values():
-        metric = store.by_metric.get("veteran_count", {}).get(year, {}).get(NC_STATE_FIPS + county_fips)
-        if metric is not None:
-            rows.append(metric)
-    return sorted(rows, key=lambda r: r.value, reverse=True)
 
 
 def all_counties_table(store: MetricsStore, year: int, metrics: list) -> list[dict]:
