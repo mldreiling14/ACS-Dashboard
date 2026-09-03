@@ -210,17 +210,31 @@ class MapMetricSpec:
     colorscale: str
     value_format: str  # "percent" | "currency" | "count" | "minutes"
     condition: str = ""  # optional grouping key, e.g. a vital-conditions framework category
+    direction: str = "neutral"  # "higher_better" | "lower_better" | "neutral" -- for concern/highlight flagging
 
 
 MAP_METRICS: list[MapMetricSpec] = [
     MapMetricSpec("veteran_pct", "Veteran % (18+ population)", "DP02", "Blues", "percent"),
-    MapMetricSpec("veteran_poverty_rate", "Poverty rate among veterans", "C21007", "Oranges", "percent"),
     MapMetricSpec(
-        "disability_rating_pct", "% veterans with service-connected disability rating", "B21100", "Purples", "percent"
+        "veteran_poverty_rate", "Poverty rate among Veterans", "C21007", "Oranges", "percent", direction="lower_better"
     ),
-    MapMetricSpec("va_healthcare_pct", "% population with VA health care coverage", "C27009", "Greens", "percent"),
-    MapMetricSpec("veteran_unemployment_rate", "Veteran unemployment rate", "B21005", "Reds", "percent"),
-    MapMetricSpec("veteran_median_income", "Median income, veterans", "B21004", "Tealgrn", "currency"),
+    MapMetricSpec(
+        "disability_rating_pct", "% Veterans with service-connected disability rating", "B21100", "Purples", "percent"
+    ),
+    MapMetricSpec(
+        "va_healthcare_pct",
+        "% population with VA health care coverage",
+        "C27009",
+        "Greens",
+        "percent",
+        direction="higher_better",
+    ),
+    MapMetricSpec(
+        "veteran_unemployment_rate", "Veteran unemployment rate", "B21005", "Reds", "percent", direction="lower_better"
+    ),
+    MapMetricSpec(
+        "veteran_median_income", "Median income, Veterans", "B21004", "Tealgrn", "currency", direction="higher_better"
+    ),
 ]
 
 # Full county-data-table metrics: veteran_count (raw estimate, not on the map/trend charts)

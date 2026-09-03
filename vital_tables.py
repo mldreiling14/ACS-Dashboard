@@ -191,6 +191,7 @@ class ComparisonMetric:
     value_format: str
     veteran_key: str
     civilian_key: str | None  # None => veteran-only, no civilian/nonveteran equivalent exists
+    direction: str = "neutral"  # "higher_better" | "lower_better" | "neutral" -- for concern/highlight flagging
 
 
 # C21007 -- poverty status by veteran status (two age bands: 18-64, 65+, summed).
@@ -303,12 +304,29 @@ COMPARE_TABLES: dict[str, TableSpec] = {
 }
 
 COMPARE_METRICS: list[ComparisonMetric] = [
-    ComparisonMetric("poverty_rate", "Poverty rate", "percent", "poverty_rate_veteran", "poverty_rate_civilian"),
     ComparisonMetric(
-        "unemployment_rate", "Unemployment rate", "percent", "unemployment_rate_veteran", "unemployment_rate_civilian"
+        "poverty_rate",
+        "Poverty rate",
+        "percent",
+        "poverty_rate_veteran",
+        "poverty_rate_civilian",
+        direction="lower_better",
     ),
     ComparisonMetric(
-        "median_income", "Median personal income", "currency", "median_income_veteran", "median_income_civilian"
+        "unemployment_rate",
+        "Unemployment rate",
+        "percent",
+        "unemployment_rate_veteran",
+        "unemployment_rate_civilian",
+        direction="lower_better",
+    ),
+    ComparisonMetric(
+        "median_income",
+        "Median personal income",
+        "currency",
+        "median_income_veteran",
+        "median_income_civilian",
+        direction="higher_better",
     ),
     ComparisonMetric(
         "hs_grad_or_higher_pct",
@@ -316,6 +334,7 @@ COMPARE_METRICS: list[ComparisonMetric] = [
         "percent",
         "hs_grad_or_higher_pct_veteran",
         "hs_grad_or_higher_pct_civilian",
+        direction="higher_better",
     ),
     ComparisonMetric(
         "bachelors_or_higher_pct",
@@ -323,6 +342,7 @@ COMPARE_METRICS: list[ComparisonMetric] = [
         "percent",
         "bachelors_or_higher_pct_veteran",
         "bachelors_or_higher_pct_civilian",
+        direction="higher_better",
     ),
     ComparisonMetric(
         "disability_rating_pct", "Service-connected disability rating", "percent", "disability_rating_pct", None

@@ -12,15 +12,20 @@ census_dashboard/
 ├── acs_tables.py              # table registry: which ACS variables per table/year, MOE math
 ├── acs_fetch.py                 # fetches + caches each (table, year), with a real-data fallback chain
 ├── acs_metrics.py                 # shapes fetch results into map/trend/card view models
-├── geo_map.py                       # NC county GeoJSON + the two Plotly figures (map, trend)
-├── generate_report.py                 # orchestrates everything above into index.html
+├── acs_db.py                        # SQLite database (data/acs.db) built from acs_metrics
+├── acs_figures.py                     # quick matplotlib bar/trend/map figures over acs_db
+├── cli.py                               # command-line query/plot interface over acs_db
+├── app.py                                 # Streamlit GUI over acs_db/acs_figures
+├── geo_map.py                             # NC county GeoJSON + the two Plotly figures (map, trend)
+├── generate_report.py                       # orchestrates everything above into index.html
 ├── templates/
-│   └── report_template.html            # Jinja2 template for the report
-├── index.html                            # generated output, committed at repo root for GitHub Pages
-├── cache/                                  # gitignored -- disk cache of every live API pull
-├── seed_data/                                # committed -- one real snapshot per table, for a zero-setup fallback
+│   └── report_template.html                    # Jinja2 template for the report
+├── index.html                                    # generated output, committed at repo root for GitHub Pages
+├── cache/                                          # gitignored -- disk cache of every live API pull
+├── seed_data/                                        # committed -- one real snapshot per table, for a zero-setup fallback
+├── data/acs.db                                         # gitignored -- rebuild anytime with `python cli.py build`
 ├── requirements.txt
-└── .env.example                                # where your free Census API key goes
+└── .env.example                                          # where your free Census API key goes
 ```
 
 `index.html` lives at the repo root (not in a build-output folder) so GitHub Pages can serve
@@ -142,7 +147,82 @@ venv\Scripts\python generate_report.py
 start index.html
 ```
 
-## 7. Adding another metric or another year
+## 7. The database + CLI — `acs_db.py` / `acs_figures.py` / `cli.py`
+
+Everything above builds one polished HTML report. For pulling a table or a quick
+chart on demand -- like using data.census.gov's own table/figure tool, but against
+this project's already-fetched veteran data -- there's a local SQLite database and
+a CLI on top of it.
+
+**Build/refresh it** (safe to re-run; upserts on `metric_key, fips, year`):
+
+```powershell
+venv\Scripts\python cli.py build          # uses cache/API/seed fallback chain, like the report does
+venv\Scripts\python cli.py build --refresh   # force a live re-fetch from the Census API
+```
+
+This writes `data/acs.db` (gitignored, like `cache/` -- rebuild it anytime; nothing
+is lost since it's derived entirely from `acs_metrics.build_store()`). Two tables:
+`metrics` (one row per metric x county x year, with value/MOE/reliability) and
+`metric_catalog` (metric_key -> label/table_id/value_format).
+
+**Query it** from the CLI:
+
+```powershell
+venv\Scripts\python cli.py metrics                                              # list available metrics
+venv\Scripts\python cli.py counties                                             # list counties
+venv\Scripts\python cli.py query --metric veteran_poverty_rate --year 2023      # one metric, one year, all counties
+venv\Scripts\python cli.py query --metric veteran_poverty_rate --county Durham  # one metric, all years, one county
+venv\Scripts\python cli.py query --metric veteran_pct --csv out.csv             # write to CSV instead of printing
+venv\Scripts\python cli.py trend --metric veteran_pct --county Durham           # year-by-year for one county
+venv\Scripts\python cli.py sql "SELECT * FROM metrics WHERE reliability = 'unreliable'"  # raw SQL escape hatch
+```
+
+**Or from Python/a notebook**, same underlying functions:
+
+```python
+import acs_db
+df = acs_db.query_metric("veteran_poverty_rate", year=2023)   # -> pandas DataFrame
+acs_db.trend("veteran_pct", county="Durham")
+acs_db.sql("SELECT county_name, value FROM metrics WHERE metric_key='veteran_median_income' ORDER BY value DESC LIMIT 10")
+```
+
+**Make a figure** without touching Plotly/the report template:
+
+```powershell
+venv\Scripts\python cli.py plot --metric veteran_poverty_rate --type bar --year 2023 --out bar.png
+venv\Scripts\python cli.py plot --metric veteran_poverty_rate --type trend --out trend.png
+venv\Scripts\python cli.py plot --metric veteran_poverty_rate --type map --year 2023 --out map.png
+```
+
+`--type trend` defaults to the 7 focus counties; pass `--counties "Durham,Nash County"`
+for others. Drop `--out` to pop up an interactive matplotlib window instead of saving.
+These are quick static PNGs (matplotlib) for exploration -- the interactive, year-slider
+Plotly map/trend charts embedded in `index.html` still come from `geo_map.py`.
+
+## 8. The GUI — `app.py`
+
+The CLI and Python API above are the fastest way to pull a table or a chart, but
+they're typed commands, not something to click around in. `app.py` is a small
+Streamlit app that wraps `acs_db.py`/`acs_figures.py` in a local web page with
+dropdowns instead -- same data, same functions, just interactive.
+
+```powershell
+venv\Scripts\streamlit run app.py
+```
+
+Opens `http://localhost:8501` in your browser. Pick a metric and a view (table,
+bar chart, map, or a county's trend over time) from the sidebar; the page
+updates live. Every table has a "Download CSV" button, and there's a "Rebuild
+database" button in the sidebar so you never need to drop back to the CLI just
+to refresh the data.
+
+This is a local dev tool, not something deployed anywhere -- close the terminal
+and it stops running. It reads the same `data/acs.db` the CLI builds, so run
+`python cli.py build` (or the in-app rebuild button) at least once before
+`streamlit run app.py` if you haven't already.
+
+## 9. Adding another metric or another year
 
 - **Another table/metric**: add a `TableSpec` to `acs_tables.TABLES` (look up
   the exact variable codes at
@@ -150,7 +230,8 @@ start index.html
   **check at least two years apart**, since variable codes can shift between
   vintages the way DP02's veteran code did at 2019), write its `derive()`,
   and add a `MapMetricSpec` to `acs_tables.MAP_METRICS`. Everything downstream
-  (fetch, cache, map dropdown, trend dropdown, focus cards, data-status table)
+  (fetch, cache, map dropdown, trend dropdown, focus cards, data-status table,
+  and the `acs_db`/`cli.py` database once you re-run `python cli.py build`)
   picks it up automatically.
 - **More years**: extend `acs_tables.YEARS`. ACS 5-year data profiles go back
   to the 2005-2009 vintage; detail tables (B/C-prefixed) are generally
@@ -161,7 +242,7 @@ start index.html
   `NC_STATE_FIPS` in `acs_tables.py` and re-running `geo_map.get_nc_counties_geojson`
   with a new state filter (currently hardcoded to `"37"` too).
 
-## 8. Troubleshooting
+## 10. Troubleshooting
 
 **`ConnectionResetError [WinError 10054]` or SSL handshake failures.** Almost
 always local network interference (AV doing HTTPS inspection, a corporate
