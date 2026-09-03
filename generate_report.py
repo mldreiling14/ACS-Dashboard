@@ -11,6 +11,7 @@ Usage:
 
 from __future__ import annotations
 
+import json
 from datetime import datetime
 from pathlib import Path
 
@@ -19,6 +20,7 @@ from jinja2 import Environment, FileSystemLoader
 from acs_metrics import (
     VETERAN_COUNT_LABEL,
     all_counties_table,
+    build_county_summary,
     build_store,
     county_metrics_for,
     focus_county_bar_rows,
@@ -28,9 +30,11 @@ from acs_metrics import (
 from acs_tables import ALL_TABLE_METRICS, MAP_METRICS, YEARS, focus_fips
 from geo_map import build_choropleth, build_trend_chart, get_nc_counties_geojson, render_html
 from scrape_acs_resources import scrape
+from vital_tables import COMPARE_METRICS, COMPARE_TABLES
 
 BASE_DIR = Path(__file__).parent
 OUTPUT_PATH = BASE_DIR / "index.html"
+COUNTIES_DIR = BASE_DIR / "counties"
 
 
 def _resolve_map_year(store) -> int:
@@ -44,6 +48,7 @@ def _resolve_map_year(store) -> int:
 def build_report() -> None:
     scraped = scrape()
     store = build_store()
+    compare_store = build_store(tables=COMPARE_TABLES)
 
     county_order = list(focus_fips().items())  # [(county_name, fips), ...] in FOCUS_COUNTY_FIPS order
     focus_fips_set = {fips for _, fips in county_order}
@@ -89,9 +94,27 @@ def build_report() -> None:
     env.filters["fmt"] = lambda value, value_format: (
         f"${value:,.0f}" if value_format == "currency" else f"{value:,.0f}" if value_format == "count" else f"{value:.1f}%"
     )
+    generated_at = datetime.now().strftime("%Y-%m-%d %H:%M")
+
+    # One executive-summary page per county (not just the 7 focus counties) -- built off the same
+    # `store`/`compare_store` already fetched above, so this adds no extra API calls.
+    county_template = env.get_template("county_report_template.html")
+    COUNTIES_DIR.mkdir(exist_ok=True)
+    county_links: dict[str, dict[str, str]] = {}
+    for fips, name in store.county_names.items():
+        summary = build_county_summary(store, compare_store, fips, map_year, metrics=MAP_METRICS, compare_metrics=COMPARE_METRICS)
+        county_links[fips] = {"name": name, "slug": summary["slug"]}
+        county_html = county_template.render(
+            generated_at=generated_at,
+            map_year=map_year,
+            summary=summary,
+        )
+        (COUNTIES_DIR / f"{summary['slug']}.html").write_text(county_html, encoding="utf-8")
+    print(f"Wrote {len(county_links)} county pages to {COUNTIES_DIR}")
+
     template = env.get_template("report_template.html")
     html = template.render(
-        generated_at=datetime.now().strftime("%Y-%m-%d %H:%M"),
+        generated_at=generated_at,
         map_year=map_year,
         years=YEARS,
         map_html=map_html,
@@ -105,6 +128,8 @@ def build_report() -> None:
         data_status=data_status,
         popular_tables=scraped["popular_tables"],
         resource_links=scraped["resource_links"],
+        county_links=county_links,
+        county_links_json=json.dumps(county_links),
     )
 
     OUTPUT_PATH.write_text(html, encoding="utf-8")

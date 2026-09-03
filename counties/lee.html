@@ -1,0 +1,397 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Lee County — Veteran Executive Summary</title>
+<style>
+  :root {
+    color-scheme: light;
+    --surface-1:      #fcfcfb;
+    --page:           #f9f9f7;
+    --text-primary:   #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted:     #898781;
+    --gridline:       #e1e0d9;
+    --baseline:       #c3c2b7;
+    --series-1:       #2a78d6;
+    --series-2:       #898781;
+    --border:         rgba(11,11,11,0.10);
+    --flag-good:      #0ca30c;
+    --flag-caution:   #fab219;
+    --flag-bad:       #d03b3b;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { color-scheme: dark;
+      --surface-1: #1a1a19; --page: #0d0d0d; --text-primary: #ffffff;
+      --text-secondary: #c3c2b7; --text-muted: #898781; --gridline: #2c2c2a;
+      --baseline: #383835; --series-1: #3987e5; --series-2: #a8a69f; --border: rgba(255,255,255,0.10);
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 2.5rem 1.25rem; background: var(--page); color: var(--text-primary);
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  main { max-width: 880px; margin: 0 auto; }
+  h1 { font-size: 1.5rem; margin: 0 0 0.25rem; }
+  .subtitle { color: var(--text-secondary); margin: 0 0 1.75rem; font-size: 0.95rem; }
+  .subtitle a { color: var(--series-1); text-decoration: none; }
+  .subtitle a:hover { text-decoration: underline; }
+  .card {
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px;
+    padding: 1.5rem; margin-bottom: 1.5rem;
+  }
+  .card h2 { font-size: 1.05rem; margin: 0 0 0.25rem; }
+  .card .caption { color: var(--text-secondary); font-size: 0.85rem; margin: 0 0 1.25rem; }
+  .data-note { color: var(--text-muted); font-size: 0.78rem; margin-top: 1rem; }
+
+  /* Key points / areas of concern */
+  ul.flag-list { list-style: none; margin: 0; padding: 0; }
+  ul.flag-list li {
+    display: flex; align-items: flex-start; gap: 0.6rem; padding: 0.55rem 0;
+    border-bottom: 1px solid var(--gridline); font-size: 0.9rem; line-height: 1.5;
+  }
+  ul.flag-list li:last-child { border-bottom: none; }
+  ul.flag-list li::before {
+    content: ""; flex: none; width: 9px; height: 9px; border-radius: 50%; margin-top: 0.4rem;
+  }
+  ul.flag-list.highlights li::before { background: var(--flag-good); }
+  ul.flag-list.concerns li::before { background: var(--flag-bad); }
+  .empty-note { color: var(--text-muted); font-size: 0.88rem; font-style: italic; }
+
+  /* All-metrics table */
+  .metric-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+  .metric-table th { text-align: left; color: var(--text-muted); font-weight: 600; font-size: 0.78rem; padding: 0.4rem 0.5rem 0.4rem 0; border-bottom: 1px solid var(--gridline); }
+  .metric-table td { padding: 0.5rem 0.5rem 0.5rem 0; border-bottom: 1px solid var(--gridline); vertical-align: baseline; }
+  .metric-table tr:last-child td { border-bottom: none; }
+  .metric-label { color: var(--text-secondary); padding-right: 0.5rem; }
+  .metric-value { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .metric-value .moe { color: var(--text-muted); font-size: 0.75rem; }
+  .metric-value.muted { color: var(--text-muted); font-style: italic; }
+  .peer-value { text-align: right; color: var(--text-secondary); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .flag-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-left: 0.5em; vertical-align: middle; }
+  .flag-dot.highlight { background: var(--flag-good); }
+  .flag-dot.concern { background: var(--flag-bad); }
+
+  .reliability-note { color: var(--text-secondary); font-size: 0.8rem; line-height: 1.6; margin: 0 0 1.1rem; padding: 0.7rem 0.9rem; background: var(--page); border-radius: 8px; }
+  .reliability-badge { display: inline-flex; align-items: center; gap: 0.3rem; font-size: 0.72rem; color: var(--text-secondary); white-space: nowrap; }
+  .reliability-badge .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+  .reliability-badge.reliable .dot   { background: var(--flag-good); }
+  .reliability-badge.caution .dot    { background: var(--flag-caution); }
+  .reliability-badge.unreliable .dot { background: var(--flag-bad); }
+  ul.reliability-list { list-style: none; margin: 0; padding: 0; }
+  ul.reliability-list li { padding: 0.5rem 0; border-bottom: 1px solid var(--gridline); font-size: 0.85rem; }
+  ul.reliability-list li:last-child { border-bottom: none; }
+  ul.reliability-list .rel-label { font-weight: 600; margin-right: 0.4rem; }
+  ul.reliability-list .rel-explainer { color: var(--text-secondary); }
+
+  /* Veteran vs. civilian comparison */
+  .compare-block { margin-bottom: 1.1rem; }
+  .compare-block:last-child { margin-bottom: 0; }
+  .compare-block h3 { font-size: 0.9rem; margin: 0 0 0.5rem; }
+  .compare-legend { display: flex; gap: 1.25rem; font-size: 0.78rem; color: var(--text-secondary); margin-bottom: 0.5rem; }
+  .compare-legend .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 0.35rem; vertical-align: middle; }
+  .compare-legend .swatch.veteran { background: var(--series-1); }
+  .compare-legend .swatch.civilian { background: var(--series-2); }
+  .compare-bars { display: flex; flex-direction: column; gap: 4px; }
+  .compare-bar-line { display: flex; align-items: center; gap: 0.6rem; }
+  .compare-bar-line .bar-track { flex: 1; height: 12px; background: var(--page); border-radius: 3px; overflow: hidden; }
+  .compare-bar-line .bar-fill { height: 100%; border-radius: 3px; }
+  .compare-bar-line.veteran .bar-fill { background: var(--series-1); }
+  .compare-bar-line.civilian .bar-fill { background: var(--series-2); }
+  .compare-bar-line .bar-value { font-size: 0.8rem; min-width: 7rem; text-align: right; font-variant-numeric: tabular-nums; }
+  .compare-gap-note { font-size: 0.78rem; margin-top: 0.35rem; }
+  .compare-gap-note.highlight { color: var(--flag-good); }
+  .compare-gap-note.concern { color: var(--flag-bad); }
+
+  footer { color: var(--text-muted); font-size: 0.78rem; text-align: center; margin-top: 2rem; }
+  footer a { color: inherit; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Lee County</h1>
+  <p class="subtitle">
+    Veteran executive summary · Generated 2026-09-03 12:00 · ACS 5-year estimates (2024) ·
+    <a href="../index.html">← Back to statewide map</a>
+  </p>
+
+  <section class="card">
+    <h2>Key points</h2>
+    <p class="caption">Metrics where this county's Veteran population meaningfully outperforms the NC county average, or Veterans outperform civilians in this county</p>
+    
+    <ul class="flag-list highlights">
+      
+      <li>Median income, Veterans: $60,315 (NC county average: $48,741)</li>
+      
+      <li>Poverty rate: 7.9% for Veterans vs 14.0% for civilians in Lee County</li>
+      
+      <li>Median personal income: $60,315 for Veterans vs $34,818 for civilians in Lee County</li>
+      
+      <li>High school graduate or higher: 96.5% for Veterans vs 83.8% for civilians in Lee County</li>
+      
+      <li>Bachelor's degree or higher: 25.6% for Veterans vs 20.7% for civilians in Lee County</li>
+      
+    </ul>
+    
+  </section>
+
+  <section class="card">
+    <h2>Areas of concern</h2>
+    <p class="caption">Metrics where this county's Veteran population meaningfully trails the NC county average, or Veterans trail civilians in this county</p>
+    
+    <p class="empty-note">No metrics trail the NC county average or civilian baseline by more than their margin of error this year.</p>
+    
+  </section>
+
+  <section class="card">
+    <h2>Veteran vs. civilian comparison</h2>
+    <p class="caption">Same county, Veteran vs. civilian/nonveteran population, 2024 · ACS detailed tables (poverty, labor force, income, education by Veteran status)</p>
+    <div class="compare-legend">
+      <span><span class="swatch veteran"></span>Veteran</span>
+      <span><span class="swatch civilian"></span>Civilian</span>
+    </div>
+    
+    <div class="compare-block">
+      <h3>Poverty rate</h3>
+      <div class="compare-bars">
+        <div class="compare-bar-line veteran">
+          <div class="bar-track"><div class="bar-fill" style="width: 56.1%;"></div></div>
+          <div class="bar-value">7.9% <span class="moe">± 3.7%</span></div>
+        </div>
+        
+        <div class="compare-bar-line civilian">
+          <div class="bar-track"><div class="bar-fill" style="width: 100.0%;"></div></div>
+          <div class="bar-value">14.0% <span class="moe">± 1.6%</span></div>
+        </div>
+        
+      </div>
+      
+      <p class="compare-gap-note highlight">
+        Veterans outperform civilians here by more than the combined margin of error.
+        
+      </p>
+      
+    </div>
+    
+    <div class="compare-block">
+      <h3>Unemployment rate</h3>
+      <div class="compare-bars">
+        <div class="compare-bar-line veteran">
+          <div class="bar-track"><div class="bar-fill" style="width: 100.0%;"></div></div>
+          <div class="bar-value">4.0% <span class="moe">± 4.4%</span></div>
+        </div>
+        
+        <div class="compare-bar-line civilian">
+          <div class="bar-track"><div class="bar-fill" style="width: 98.2%;"></div></div>
+          <div class="bar-value">4.0% <span class="moe">± 1.1%</span></div>
+        </div>
+        
+      </div>
+      
+    </div>
+    
+    <div class="compare-block">
+      <h3>Median personal income</h3>
+      <div class="compare-bars">
+        <div class="compare-bar-line veteran">
+          <div class="bar-track"><div class="bar-fill" style="width: 100.0%;"></div></div>
+          <div class="bar-value">$60,315 <span class="moe">± $8,100</span></div>
+        </div>
+        
+        <div class="compare-bar-line civilian">
+          <div class="bar-track"><div class="bar-fill" style="width: 57.7%;"></div></div>
+          <div class="bar-value">$34,818 <span class="moe">± $1,468</span></div>
+        </div>
+        
+      </div>
+      
+      <p class="compare-gap-note highlight">
+        Veterans outperform civilians here by more than the combined margin of error.
+        
+      </p>
+      
+    </div>
+    
+    <div class="compare-block">
+      <h3>High school graduate or higher</h3>
+      <div class="compare-bars">
+        <div class="compare-bar-line veteran">
+          <div class="bar-track"><div class="bar-fill" style="width: 100.0%;"></div></div>
+          <div class="bar-value">96.5% <span class="moe">± 3.8%</span></div>
+        </div>
+        
+        <div class="compare-bar-line civilian">
+          <div class="bar-track"><div class="bar-fill" style="width: 86.8%;"></div></div>
+          <div class="bar-value">83.8% <span class="moe">± 3.1%</span></div>
+        </div>
+        
+      </div>
+      
+      <p class="compare-gap-note highlight">
+        Veterans outperform civilians here by more than the combined margin of error.
+        
+      </p>
+      
+    </div>
+    
+    <div class="compare-block">
+      <h3>Bachelor's degree or higher</h3>
+      <div class="compare-bars">
+        <div class="compare-bar-line veteran">
+          <div class="bar-track"><div class="bar-fill" style="width: 100.0%;"></div></div>
+          <div class="bar-value">25.6% <span class="moe">± 4.2%</span></div>
+        </div>
+        
+        <div class="compare-bar-line civilian">
+          <div class="bar-track"><div class="bar-fill" style="width: 80.6%;"></div></div>
+          <div class="bar-value">20.7% <span class="moe">± 1.8%</span></div>
+        </div>
+        
+      </div>
+      
+      <p class="compare-gap-note highlight">
+        Veterans outperform civilians here by more than the combined margin of error.
+        
+      </p>
+      
+    </div>
+    
+    <div class="compare-block">
+      <h3>Service-connected disability rating</h3>
+      <div class="compare-bars">
+        <div class="compare-bar-line veteran">
+          <div class="bar-track"><div class="bar-fill" style="width: 100.0%;"></div></div>
+          <div class="bar-value">40.3% <span class="moe">± 7.4%</span></div>
+        </div>
+        
+        <p class="data-note" style="margin-top:0.3rem;">Veteran-only metric — no civilian population has a service-connected disability rating.</p>
+        
+      </div>
+      
+    </div>
+    
+  </section>
+
+  <section class="card">
+    <h2>All Veteran metrics</h2>
+    <p class="caption">Every tracked Veteran metric for Lee County, 2024, against the NC county average</p>
+    <table class="metric-table">
+      <thead>
+        <tr><th>Metric</th><th style="text-align:right;">Lee County</th><th style="text-align:right;">NC county average</th><th></th></tr>
+      </thead>
+      <tbody>
+        
+        <tr>
+          <td class="metric-label">Veteran % (18+ population)</td>
+          
+          <td class="metric-value">7.2% <span class="moe">± 1.0%</span></td>
+          
+          <td class="peer-value">8.2%</td>
+          <td></td>
+        </tr>
+        
+        <tr>
+          <td class="metric-label">Poverty rate among Veterans</td>
+          
+          <td class="metric-value">7.9% <span class="moe">± 3.7%</span></td>
+          
+          <td class="peer-value">8.4%</td>
+          <td></td>
+        </tr>
+        
+        <tr>
+          <td class="metric-label">% Veterans with service-connected disability rating</td>
+          
+          <td class="metric-value">40.3% <span class="moe">± 7.4%</span></td>
+          
+          <td class="peer-value">31.7%</td>
+          <td></td>
+        </tr>
+        
+        <tr>
+          <td class="metric-label">% population with VA health care coverage</td>
+          
+          <td class="metric-value">3.1% <span class="moe">± 0.6%</span></td>
+          
+          <td class="peer-value">3.3%</td>
+          <td></td>
+        </tr>
+        
+        <tr>
+          <td class="metric-label">Veteran unemployment rate</td>
+          
+          <td class="metric-value">4.0% <span class="moe">± 4.4%</span></td>
+          
+          <td class="peer-value">3.7%</td>
+          <td></td>
+        </tr>
+        
+        <tr>
+          <td class="metric-label">Median income, Veterans</td>
+          
+          <td class="metric-value">$60,315 <span class="moe">± $8,100</span></td>
+          
+          <td class="peer-value">$48,741</td>
+          <td><span class="flag-dot highlight" title="Better than the NC county average"></span></td>
+        </tr>
+        
+      </tbody>
+    </table>
+    <p class="data-note">"NC county average" is the unweighted mean of this metric across all 100 NC counties for 2024 — a typical-county baseline, not the Census Bureau's own statewide estimate. A dot marks a gap larger than this county's own margin of error.</p>
+  </section>
+
+  <section class="card">
+    <h2>Data reliability</h2>
+    <p class="reliability-note">
+      <strong>Reliability</strong> reflects how large the margin of error is relative to the estimate
+      (the coefficient of variation, CV -- Census Bureau convention):
+      <span class="reliability-badge reliable"><span class="dot"></span>reliable</span> CV &lt; 15% ·
+      <span class="reliability-badge caution"><span class="dot"></span>caution</span> CV 15–30% ·
+      <span class="reliability-badge unreliable"><span class="dot"></span>unreliable</span> CV &gt; 30%.
+      Veteran-status cross-tabs (poverty, unemployment, income, education by Veteran status) land in
+      caution/unreliable more often in smaller counties -- treat those numbers as directional, not precise.
+    </p>
+    
+    <ul class="reliability-list">
+      
+      <li>
+        <span class="reliability-badge caution"><span class="dot"></span></span>
+        <span class="rel-label">Poverty rate among Veterans</span>
+        <span class="rel-explainer">Use with caution: the margin of error is fairly large relative to the estimate. Treat this as an approximate figure, not an exact one.</span>
+      </li>
+      
+      <li>
+        <span class="reliability-badge unreliable"><span class="dot"></span></span>
+        <span class="rel-label">Veteran unemployment rate</span>
+        <span class="rel-explainer">Unreliable: the margin of error is very large relative to the estimate. Treat this as a rough signal only, not a precise number.</span>
+      </li>
+      
+      <li>
+        <span class="reliability-badge caution"><span class="dot"></span></span>
+        <span class="rel-label">Poverty rate (Veteran)</span>
+        <span class="rel-explainer">Use with caution: the margin of error is fairly large relative to the estimate. Treat this as an approximate figure, not an exact one.</span>
+      </li>
+      
+      <li>
+        <span class="reliability-badge unreliable"><span class="dot"></span></span>
+        <span class="rel-label">Unemployment rate (Veteran)</span>
+        <span class="rel-explainer">Unreliable: the margin of error is very large relative to the estimate. Treat this as a rough signal only, not a precise number.</span>
+      </li>
+      
+      <li>
+        <span class="reliability-badge caution"><span class="dot"></span></span>
+        <span class="rel-label">Unemployment rate (Civilian)</span>
+        <span class="rel-explainer">Use with caution: the margin of error is fairly large relative to the estimate. Treat this as an approximate figure, not an exact one.</span>
+      </li>
+      
+    </ul>
+    
+  </section>
+
+  <footer>
+    Built with the Census Data API and public ACS resources · <a href="../index.html">← Back to statewide map</a>
+  </footer>
+</main>
+</body>
+</html>

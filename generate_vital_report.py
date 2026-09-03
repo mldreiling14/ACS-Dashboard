@@ -16,7 +16,14 @@ from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader
 
-from acs_metrics import all_counties_table, build_store, county_metrics_for, focus_county_card, trend_series
+from acs_metrics import (
+    RELIABILITY_EXPLAINER,
+    all_counties_table,
+    build_store,
+    county_metrics_for,
+    focus_county_card,
+    trend_series,
+)
 from acs_tables import YEARS, focus_fips
 from geo_map import build_choropleth, build_trend_chart, get_nc_counties_geojson, render_html
 from scrape_acs_resources import scrape
@@ -24,14 +31,6 @@ from vital_tables import COMPARE_METRICS, COMPARE_TABLES, VITAL_CONDITIONS, VITA
 
 BASE_DIR = Path(__file__).parent
 OUTPUT_PATH = BASE_DIR / "vital_conditions.html"
-
-# Plain-language reliability explanations, shown as hover text next to every reliability dot --
-# the CV-based reliable/caution/unreliable flags mean nothing to a reader who isn't a statistician.
-RELIABILITY_EXPLAINER = {
-    "reliable": "Reliable: the margin of error is small relative to the estimate, so this number is fairly precise.",
-    "caution": "Use with caution: the margin of error is fairly large relative to the estimate. Treat this as an approximate figure, not an exact one.",
-    "unreliable": "Unreliable: the margin of error is very large relative to the estimate. Treat this as a rough signal only, not a precise number.",
-}
 
 
 def _resolve_map_year(store) -> int:
