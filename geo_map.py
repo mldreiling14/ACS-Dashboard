@@ -190,18 +190,18 @@ def build_choropleth(
             )
         )
 
-    # Dashed county-border overlay, drawn once on top of every choropleth trace and always
-    # visible -- borders don't change per metric/year, so this one trace never needs updating.
-    # Added after the metric traces (a fixed extra index beyond them), so it's important that
-    # nothing below restyles/animates "all traces" without naming indices, or this would get
-    # swept up in a metric switch or year-frame update.
+    # County-border overlay, drawn once on top of every choropleth trace and always visible --
+    # borders don't change per metric/year, so this one trace never needs updating. Added after
+    # the metric traces (a fixed extra index beyond them), so it's important that nothing below
+    # restyles/animates "all traces" without naming indices, or this would get swept up in a
+    # metric switch or year-frame update.
     boundary_lons, boundary_lats = _county_boundary_lines(geojson)
     fig.add_trace(
         go.Scattergeo(
             lon=boundary_lons,
             lat=boundary_lats,
             mode="lines",
-            line=dict(width=1.3, color="#4a4944", dash="dash"),
+            line=dict(width=0.9, color="#9c9a93"),
             hoverinfo="skip",
             showlegend=False,
         )
