@@ -84,6 +84,30 @@
   }
   .county-jump button:hover { border-color: var(--series-1); color: var(--series-1); }
 
+  /* Trend chart controls: metric select + NC-average toggle + a searchable, capped
+     multi-select county checklist -- replaces the old fixed-7-focus-county/rangeslider setup. */
+  .trend-controls { margin: 0 0 1.1rem; }
+  .trend-control-row { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 0.6rem; }
+  .trend-control-row label { font-size: 0.85rem; color: var(--text-secondary); }
+  .trend-control-row select, .trend-control-row input[type="search"] {
+    padding: 0.45rem 0.7rem; border-radius: 8px; border: 1px solid var(--border);
+    background: var(--page); color: var(--text-primary); font-size: 0.85rem;
+  }
+  .trend-control-row select:focus, .trend-control-row input:focus { outline: 2px solid var(--series-1); outline-offset: -1px; }
+  .trend-avg-toggle { display: flex; align-items: center; gap: 0.4rem; }
+  .trend-avg-toggle input { accent-color: var(--series-1); }
+  .trend-county-picker { border: 1px solid var(--border); border-radius: 10px; padding: 0.75rem 0.9rem; background: var(--page); }
+  .trend-county-picker input[type="search"] { flex: 0 1 240px; }
+  .trend-selected-count { font-size: 0.78rem; color: var(--text-muted); white-space: nowrap; }
+  .trend-county-list {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 0.15rem 0.5rem;
+    max-height: 180px; overflow-y: auto; padding-right: 0.3rem;
+  }
+  .trend-county-option { display: flex; align-items: center; gap: 0.4rem; font-size: 0.82rem; color: var(--text-secondary); padding: 0.15rem 0; cursor: pointer; }
+  .trend-county-option input { accent-color: var(--series-1); flex: none; }
+  .trend-county-option.is-hidden { display: none; }
+  .trend-county-option.is-disabled { opacity: 0.4; cursor: not-allowed; }
+
   /* Plotly figures render as their own fixed-chrome widget (light surface, baked at
      generation time) regardless of the page's light/dark mode -- see geo_map.py. Map is
      locked (dragmode off, scrollZoom off -- see STATIC_MAP_CONFIG), so no grab cursor there. */
@@ -93,6 +117,10 @@
   .metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1rem; }
   .metric-item h3 { font-size: 0.9rem; margin: 0 0 0.25rem; }
   .metric-item p { color: var(--text-secondary); font-size: 0.85rem; line-height: 1.5; margin: 0; }
+  .scope-badge {
+    display: inline-block; font-size: 0.68rem; color: var(--text-muted); border: 1px solid var(--border);
+    border-radius: 999px; padding: 0.05rem 0.5rem; vertical-align: middle; white-space: nowrap; margin-left: 0.3rem;
+  }
 
   /* All-counties explorer table */
   .table-controls { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 0.9rem; }
@@ -131,9 +159,11 @@
   <p class="subtitle">Generated {{ generated_at }} · Source: U.S. Census Bureau, ACS 5-Year Estimates ({{ years[0] }}–{{ years[-1] }}) · Map shown for {{ map_year }}</p>
   <p class="intro">
     This site tracks six Veteran-specific measures — population share, poverty, service-connected
-    disability rating, VA health care coverage, unemployment, and income — across all 100 North
-    Carolina counties, {{ years[0] }}–{{ years[-1] }}. Switch metrics with each dropdown and years
-    with the map's slider, then open any county for its full executive summary.
+    disability rating, VA health care coverage, unemployment, and income — plus two county-wide
+    context measures with no Veteran-specific breakdown available in ACS (SNAP/food assistance
+    receipt, health insurance coverage), across all 100 North Carolina counties,
+    {{ years[0] }}–{{ years[-1] }}. Switch metrics with each dropdown and years with the map's
+    slider, then open any county for its full executive summary.
   </p>
 
   <div class="tabs">
@@ -169,8 +199,33 @@
     <div class="tab-panel" role="tabpanel" id="panel-chart" aria-labelledby="tab-chart" hidden>
       <section class="card">
         <h2>Trend over time</h2>
-        <p class="caption">Each metric's own top 7 counties, plus the NC county average · {{ years[0] }}–{{ years[-1] }} · dropdown switches metric · drag the bar below the chart to zoom into a year range</p>
-        <div class="plotly-wrap">{{ trend_html | safe }}</div>
+        <p class="caption">{{ years[0] }}–{{ years[-1] }} · pick a metric and up to 10 counties to compare</p>
+
+        <div class="trend-controls">
+          <div class="trend-control-row">
+            <label for="trend-metric-select">Metric:</label>
+            <select id="trend-metric-select">
+              {% for m in map_metrics %}
+              <option value="{{ m.key }}" data-format="{{ m.value_format }}" {% if m.key == default_trend_metric %}selected{% endif %}>{{ m.label }}</option>
+              {% endfor %}
+            </select>
+            <label class="trend-avg-toggle"><input type="checkbox" id="trend-avg-toggle" checked> Show NC county average</label>
+          </div>
+
+          <div class="trend-county-picker">
+            <div class="trend-control-row">
+              <input type="search" id="trend-county-search" placeholder="Filter counties…" autocomplete="off">
+              <span class="trend-selected-count" id="trend-selected-count"></span>
+            </div>
+            <div class="trend-county-list" id="trend-county-list">
+              {% for fips, name in trend_county_order %}
+              <label class="trend-county-option"><input type="checkbox" class="trend-county-check" value="{{ fips }}" {% if fips in default_trend_fips %}checked{% endif %}> {{ name }}</label>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+
+        <div class="plotly-wrap" id="trend-chart-wrap">{{ trend_html | safe }}</div>
       </section>
 
       <section class="card">
@@ -223,11 +278,11 @@
     <div class="tab-panel" role="tabpanel" id="panel-about" aria-labelledby="tab-about" hidden>
       <section class="card">
         <h2>What this map shows</h2>
-        <p class="caption">Six ACS 5-year Veteran metrics, {{ map_year }} · every county's executive summary also flags how it compares to the NC county average and to civilians in the same county</p>
+        <p class="caption">Eight ACS 5-year metrics, {{ map_year }} · every county's executive summary also flags how it compares to the NC county average and to civilians in the same county</p>
         <div class="metrics-grid">
           {% for m in map_metrics %}
           <div class="metric-item">
-            <h3>{{ m.label }}</h3>
+            <h3>{{ m.label }}{% if m.scope == "total_population" %} <span class="scope-badge">total pop.</span>{% endif %}</h3>
             <p>{{ metric_descriptions.get(m.key, "") }}</p>
           </div>
           {% endfor %}
@@ -312,6 +367,90 @@
     jumpButton.addEventListener('click', goToTypedCounty);
     jumpInput.addEventListener('keydown', function (e) { if (e.key === 'Enter') goToTypedCounty(); });
   }
+})();
+
+(function () {
+  // Trend chart: every (metric, county) trace already exists in the figure (mostly hidden) --
+  // this picks which ones to show via Plotly.restyle instead of a baked-in Plotly dropdown, so
+  // "which counties" can be a free multi-select instead of a fixed top-N per metric.
+  var traceMeta = {{ trend_trace_meta_json | safe }};  // [{metric, fips, is_average}, ...], parallel to the figure's traces
+  var wrap = document.getElementById('trend-chart-wrap');
+  var plot = wrap && wrap.querySelector('.js-plotly-plot');
+  if (!plot || !window.Plotly) return;
+
+  var COLORS = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#4a3aa7'];
+  var MAX_SELECTED = 10;
+
+  var metricSelect = document.getElementById('trend-metric-select');
+  var avgToggle = document.getElementById('trend-avg-toggle');
+  var checks = Array.prototype.slice.call(document.querySelectorAll('.trend-county-check'));
+  var countLabel = document.getElementById('trend-selected-count');
+  var search = document.getElementById('trend-county-search');
+
+  // Order matters here: a county's color is its position in this list, so it stays stable as
+  // long as it stays checked, and newly-checked counties always get the next color in line.
+  var selectedOrder = checks.filter(function (c) { return c.checked; }).map(function (c) { return c.value; });
+
+  function updateCountLabel() {
+    countLabel.textContent = selectedOrder.length + ' of ' + checks.length + ' selected (max ' + MAX_SELECTED + ')';
+  }
+
+  function render() {
+    var metric = metricSelect.value;
+    var showAvg = avgToggle.checked;
+    var visible = new Array(traceMeta.length);
+    var colorIdx = [];
+    var colorVal = [];
+
+    traceMeta.forEach(function (meta, i) {
+      if (meta.metric !== metric) { visible[i] = false; return; }
+      if (meta.is_average) { visible[i] = showAvg; return; }
+      var order = selectedOrder.indexOf(meta.fips);
+      visible[i] = order !== -1;
+      if (order !== -1) { colorIdx.push(i); colorVal.push(COLORS[order % COLORS.length]); }
+    });
+
+    Plotly.restyle(plot, { visible: visible });
+    if (colorIdx.length) Plotly.restyle(plot, { 'line.color': colorVal }, colorIdx);
+
+    var opt = metricSelect.options[metricSelect.selectedIndex];
+    var format = opt ? opt.getAttribute('data-format') : 'percent';
+    Plotly.relayout(plot, { 'yaxis.ticksuffix': format === 'percent' ? '%' : '' });
+  }
+
+  metricSelect.addEventListener('change', render);
+  avgToggle.addEventListener('change', render);
+
+  checks.forEach(function (check) {
+    check.addEventListener('change', function () {
+      if (check.checked) {
+        if (selectedOrder.length >= MAX_SELECTED) {
+          check.checked = false;
+          return;
+        }
+        selectedOrder.push(check.value);
+      } else {
+        selectedOrder.splice(selectedOrder.indexOf(check.value), 1);
+      }
+      updateCountLabel();
+      render();
+    });
+  });
+
+  if (search) {
+    search.addEventListener('input', function () {
+      var q = search.value.trim().toLowerCase();
+      document.querySelectorAll('.trend-county-option').forEach(function (label) {
+        var name = label.textContent.trim().toLowerCase();
+        label.classList.toggle('is-hidden', q.length > 0 && name.indexOf(q) === -1);
+      });
+    });
+  }
+
+  updateCountLabel();
+  render();  // Python pre-sets the right traces visible for the default selection, but every
+             // trace starts the same placeholder color -- this pass applies the real per-county
+             // selection-order colors before the reader ever touches a control.
 })();
 
 (function () {

@@ -37,15 +37,22 @@ OUTPUT_PATH = BASE_DIR / "index.html"
 COUNTIES_DIR = BASE_DIR / "counties"
 
 # One-line plain-language descriptions for the "What this map shows" reference card --
-# MAP_METRICS itself carries no prose, just the id/label/table/color/format/direction needed
-# to fetch and render each metric.
+# MAP_METRICS itself carries no prose, just the id/label/table/color/format/direction/scope
+# needed to fetch and render each metric. Every description is explicit about *whose*
+# population the percentage is measured against (Veterans vs. everyone) -- ACS only
+# cross-tabulates a handful of things by Veteran status at all (poverty, unemployment, income,
+# education, disability rating); SNAP receipt and general health insurance coverage have no
+# Veteran-specific breakdown anywhere in ACS, so those two are necessarily total-population
+# context metrics, not Veteran-specific ones.
 METRIC_DESCRIPTIONS: dict[str, str] = {
-    "veteran_pct": "Share of the 18+ population who are Veterans.",
-    "veteran_poverty_rate": "Share of Veterans living below the poverty line.",
-    "disability_rating_pct": "Share of Veterans with a VA-recognized service-connected disability rating.",
-    "va_healthcare_pct": "Share of the total population covered by VA health care (not Veterans-only).",
-    "veteran_unemployment_rate": "Share of Veterans in the labor force who are unemployed.",
-    "veteran_median_income": "Median personal income among Veterans.",
+    "veteran_pct": "Share of the county's 18+ population who are Veterans.",
+    "veteran_poverty_rate": "Share of Veterans (not the general population) living below the poverty line.",
+    "disability_rating_pct": "Share of Veterans (not the general population) with a VA-recognized service-connected disability rating.",
+    "va_healthcare_pct": "Share of the TOTAL population (Veteran and non-Veteran) covered by VA health care -- a coverage-reach proxy, not a Veteran-only rate.",
+    "veteran_unemployment_rate": "Share of Veterans in the labor force (not the general population) who are unemployed.",
+    "veteran_median_income": "Median personal income among Veterans specifically, not the general population.",
+    "snap_pct": "Share of ALL households (not Veteran-specific -- ACS doesn't cross-tabulate SNAP receipt by Veteran status) receiving SNAP/food-stamp benefits.",
+    "no_health_insurance_pct": "Share of the TOTAL population (not Veteran-specific -- ACS doesn't cross-tabulate general health insurance coverage by Veteran status) with no health insurance coverage.",
 }
 
 
@@ -78,18 +85,29 @@ def build_report() -> None:
     map_fig = build_choropleth(geojson, MAP_METRICS, data_by_metric_year, set(), YEARS, map_year)
     map_html = render_html(map_fig, include_plotlyjs="cdn", config=STATIC_MAP_CONFIG)
 
-    # Chart tab: each metric's own top-7 counties (not a fixed subset) plus an NC-average
-    # reference line for the trend view, and a top-20 ranked bar view for the map's snapshot year.
-    top_counties_by_metric = {m.key: _top_counties(store, m.key, map_year) for m in MAP_METRICS}
-    trend_series_by_metric_fips = {
-        m.key: {fips: trend_series(store, m.key, fips) for _, fips in top_counties_by_metric[m.key]} for m in MAP_METRICS
+    # Chart tab: every county's trend line is available for every metric, but the page's own JS
+    # controls -- not a Python-baked dropdown/rangeslider -- decide which ones actually show (see
+    # build_statewide_trend_chart's docstring). A handful of counties are pre-selected here just
+    # so the chart isn't empty on first paint; the reader picks their own from there.
+    county_order = sorted(store.county_names.items(), key=lambda kv: kv[1])  # [(fips, name), ...] alphabetical
+    all_series_by_metric_fips = {
+        m.key: {fips: trend_series(store, m.key, fips) for fips, _ in county_order} for m in MAP_METRICS
     }
     nc_average_by_metric = {
         m.key: [(y, avg[0]) for y in YEARS if (avg := peer_average(store, m.key, y)) is not None] for m in MAP_METRICS
     }
-    trend_fig = build_statewide_trend_chart(MAP_METRICS, top_counties_by_metric, trend_series_by_metric_fips, nc_average_by_metric)
+    default_fips = [fips for _, fips in _top_counties(store, MAP_METRICS[0].key, map_year, n=5)]
+    trend_fig, trend_trace_meta = build_statewide_trend_chart(
+        MAP_METRICS,
+        all_series_by_metric_fips,
+        [(name, fips) for fips, name in county_order],
+        nc_average_by_metric,
+        default_metric_key=MAP_METRICS[0].key,
+        default_fips=default_fips,
+    )
     trend_html = render_html(trend_fig, include_plotlyjs=False)  # plotly.js already loaded by the map
 
+    # Top-20 ranked bar view for the map's snapshot year.
     bar_fig = build_bar_chart(MAP_METRICS, {m.key: data_by_metric_year[m.key][map_year] for m in MAP_METRICS}, top_n=20)
     bar_html = render_html(bar_fig, include_plotlyjs=False)
 
@@ -130,6 +148,10 @@ def build_report() -> None:
         metric_descriptions=METRIC_DESCRIPTIONS,
         all_counties=all_counties,
         all_metrics=ALL_TABLE_METRICS,
+        trend_county_order=[(fips, name) for fips, name in county_order],
+        default_trend_fips=set(default_fips),
+        default_trend_metric=MAP_METRICS[0].key,
+        trend_trace_meta_json=json.dumps(trend_trace_meta),
         county_links=county_links,
         county_links_json=json.dumps(county_links),
     )

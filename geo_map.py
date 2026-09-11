@@ -356,37 +356,47 @@ NC_AVERAGE_COLOR = "#9c9a93"  # same light-gray family as the map's county borde
 
 def build_statewide_trend_chart(
     metrics: list[MapMetricSpec],
-    top_counties_by_metric: dict[str, list[tuple[str, str]]],  # metric_key -> [(county_name, fips), ...]
-    series_by_metric_fips: dict[str, dict[str, list[CountyMetric]]],  # metric_key -> fips -> [CountyMetric per year]
+    all_series_by_metric_fips: dict[str, dict[str, list[CountyMetric]]],  # metric_key -> fips -> [CountyMetric/year]
+    county_order: list[tuple[str, str]],  # [(county_name, fips), ...], every county, alphabetical
     nc_average_by_metric: dict[str, list[tuple[int, float]]],  # metric_key -> [(year, avg_value), ...]
-) -> go.Figure:
-    """Multi-year trend, one dropdown-switched view per metric: that metric's own top-7 counties
-    (highest value, not a fixed cross-metric subset -- each metric can highlight a different 7)
-    plus a dashed "NC county average" reference line. Same dropdown/rangeslider pattern as
-    build_trend_chart, generalized to a variable number of lines per metric."""
-    fig = go.Figure()
-    trace_metric_idx: list[int] = []  # which metric (by index) each trace belongs to, in add order
+    default_metric_key: str,
+    default_fips: list[str],  # counties visible on first paint, before any user interaction
+) -> tuple[go.Figure, list[dict]]:
+    """Multi-year trend with every county's own line available (metric x county), driven entirely
+    by the page's own JS rather than a baked-in Plotly dropdown: there's no fixed "top N" or fixed
+    subset here, so a Python-side updatemenu can't pre-compute the visibility states the way
+    build_trend_chart's fixed-7-focus-county version does. No rangeslider either -- it read as a
+    second, confusing zoom control sitting right under an already-interactive chart.
 
-    for i, metric in enumerate(metrics):
-        fips_series = series_by_metric_fips.get(metric.key, {})
-        for j, (county_name, fips) in enumerate(top_counties_by_metric.get(metric.key, [])):
+    Returns (figure, trace_meta): trace_meta is a JSON-able list, one entry per trace in the same
+    order as fig.data, e.g. {"metric": "veteran_poverty_rate", "fips": "37001", "is_average":
+    False} -- the page's JS uses it to compute which traces a given (metric, county-selection)
+    combination should show via Plotly.restyle, and to recolor the currently-selected counties by
+    selection order (see report_template.html)."""
+    fig = go.Figure()
+    trace_meta: list[dict] = []
+
+    for metric in metrics:
+        fips_series = all_series_by_metric_fips.get(metric.key, {})
+        is_default_metric = metric.key == default_metric_key
+        for county_name, fips in county_order:
             points = fips_series.get(fips, [])
+            selected = is_default_metric and fips in default_fips
             fig.add_trace(
                 go.Scatter(
                     x=[p.year for p in points],
                     y=[p.value for p in points],
                     mode="lines+markers",
                     name=county_name,
-                    line=dict(color=FOCUS_COUNTY_COLORS[j % len(FOCUS_COUNTY_COLORS)], width=2),
+                    line=dict(color=FOCUS_COUNTY_COLORS[0], width=2),  # JS recolors by selection order
                     marker=dict(size=6),
-                    visible=(i == 0),
+                    visible=selected,
                     hovertemplate=f"<b>{county_name}</b><br>%{{x}}: {{y}}<extra></extra>".replace(
                         "{y}", "%{y:.1f}" if metric.value_format == "percent" else "%{y:$,.0f}"
                     ),
-                    legendgroup=f"{metric.key}-{county_name}",
                 )
             )
-            trace_metric_idx.append(i)
+            trace_meta.append({"metric": metric.key, "fips": fips, "is_average": False})
 
         avg_series = nc_average_by_metric.get(metric.key, [])
         fig.add_trace(
@@ -396,47 +406,26 @@ def build_statewide_trend_chart(
                 mode="lines",
                 name="NC county average",
                 line=dict(color=NC_AVERAGE_COLOR, width=2, dash="dash"),
-                visible=(i == 0),
+                visible=is_default_metric,
                 hovertemplate="<b>NC county average</b><br>%{x}: %{y:.1f}<extra></extra>"
                 if metric.value_format == "percent"
                 else "<b>NC county average</b><br>%{x}: %{y:$,.0f}<extra></extra>",
-                legendgroup=f"{metric.key}-avg",
             )
         )
-        trace_metric_idx.append(i)
+        trace_meta.append({"metric": metric.key, "fips": None, "is_average": True})
 
-    # No in-figure title -- see the matching note in build_choropleth; the dropdown already
-    # names the current metric.
-    buttons = [
-        dict(
-            label=metric.label,
-            method="update",
-            args=[
-                {"visible": [idx == i for idx in trace_metric_idx]},
-                {"yaxis.ticksuffix": "%" if metric.value_format == "percent" else ""},
-            ],
-        )
-        for i, metric in enumerate(metrics)
-    ]
-
+    default_format = next((m.value_format for m in metrics if m.key == default_metric_key), "percent")
     fig.update_layout(
-        updatemenus=[dict(buttons=buttons, direction="down", x=0.02, y=1.18, xanchor="left")],
         paper_bgcolor=SURFACE,
         plot_bgcolor=SURFACE,
-        margin=dict(l=60, r=40, t=70, b=210),
-        height=480,
-        # up to 8 series (7 counties + NC average) wrap to 2-3 legend rows -- pushed well below
-        # the rangeslider (not just below the x-axis) so a wrapped row doesn't land on the slider.
-        legend=dict(orientation="h", y=-0.62),
-        xaxis=dict(
-            dtick=1,
-            gridcolor="#e1e0d9",
-            rangeslider=dict(visible=True, thickness=0.06, bgcolor=SURFACE, bordercolor="#e1e0d9", borderwidth=1),
-        ),
-        yaxis=dict(gridcolor="#e1e0d9", ticksuffix="%" if metrics[0].value_format == "percent" else ""),
+        margin=dict(l=60, r=40, t=20, b=90),
+        height=460,
+        legend=dict(orientation="h", y=-0.22),
+        xaxis=dict(dtick=1, gridcolor="#e1e0d9"),
+        yaxis=dict(gridcolor="#e1e0d9", ticksuffix="%" if default_format == "percent" else ""),
         font=dict(family="system-ui, -apple-system, 'Segoe UI', sans-serif", color="#0b0b0b"),
     )
-    return fig
+    return fig, trace_meta
 
 
 def build_bar_chart(

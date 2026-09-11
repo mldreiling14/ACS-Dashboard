@@ -72,6 +72,10 @@
   .flag-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-left: 0.5em; vertical-align: middle; }
   .flag-dot.highlight { background: var(--flag-good); }
   .flag-dot.concern { background: var(--flag-bad); }
+  .scope-badge {
+    display: inline-block; font-size: 0.68rem; color: var(--text-muted); border: 1px solid var(--border);
+    border-radius: 999px; padding: 0.05rem 0.5rem; vertical-align: middle; white-space: nowrap;
+  }
 
   .reliability-note { color: var(--text-secondary); font-size: 0.8rem; line-height: 1.6; margin: 0 0 1.1rem; padding: 0.7rem 0.9rem; background: var(--page); border-radius: 8px; }
   .reliability-badge { display: inline-flex; align-items: center; gap: 0.3rem; font-size: 0.72rem; color: var(--text-secondary); white-space: nowrap; }
@@ -112,15 +116,17 @@
 <main>
   <h1>Buncombe County</h1>
   <p class="subtitle">
-    Veteran executive summary · Generated 2026-09-03 13:46 · ACS 5-year estimates (2024) ·
+    Veteran executive summary · Generated 2026-09-11 14:45 · ACS 5-year estimates (2024) ·
     <a href="../index.html">← Back to statewide map</a>
   </p>
 
   <section class="card">
     <h2>Key points</h2>
-    <p class="caption">Metrics where this county's Veteran population meaningfully outperforms the NC county average, or Veterans outperform civilians in this county</p>
+    <p class="caption">Metrics where this county meaningfully outperforms the NC county average (mostly Veteran-specific; SNAP and health insurance are county-wide), or Veterans outperform civilians here</p>
     
     <ul class="flag-list highlights">
+      
+      <li>SNAP/food assistance receipt (% of households, total population): 9.5% (NC county average: 16.0%)</li>
       
       <li>Poverty rate: 7.0% for Veterans vs 11.5% for civilians in Buncombe County</li>
       
@@ -134,11 +140,11 @@
 
   <section class="card">
     <h2>Areas of concern</h2>
-    <p class="caption">Metrics where this county's Veteran population meaningfully trails the NC county average, or Veterans trail civilians in this county</p>
+    <p class="caption">Metrics where this county meaningfully trails the NC county average (mostly Veteran-specific; SNAP and health insurance are county-wide), or Veterans trail civilians here</p>
     
     <ul class="flag-list concerns">
       
-      <li>% population with VA health care coverage: 2.9% (NC county average: 3.3%)</li>
+      <li>VA health care coverage (% of total population): 2.9% (NC county average: 3.3%)</li>
       
       <li>Bachelor's degree or higher: 42.4% for Veterans vs 46.2% for civilians in Buncombe County</li>
       
@@ -275,8 +281,8 @@
   </section>
 
   <section class="card">
-    <h2>All Veteran metrics</h2>
-    <p class="caption">Every tracked Veteran metric for Buncombe County, 2024, against the NC county average</p>
+    <h2>All tracked metrics</h2>
+    <p class="caption">Every tracked metric for Buncombe County, 2024, against the NC county average. Most are Veteran-specific; two (marked <span class="scope-badge">total pop.</span>) are county-wide context metrics with no Veteran-specific breakdown available anywhere in ACS.</p>
     <table class="metric-table">
       <thead>
         <tr><th>Metric</th><th style="text-align:right;">Buncombe County</th><th style="text-align:right;">NC county average</th><th></th></tr>
@@ -311,7 +317,7 @@
         </tr>
         
         <tr>
-          <td class="metric-label">% population with VA health care coverage</td>
+          <td class="metric-label">VA health care coverage (% of total population) <span class="scope-badge">total pop.</span></td>
           
           <td class="metric-value">2.9% <span class="moe">± 0.3%</span></td>
           
@@ -334,6 +340,24 @@
           <td class="metric-value">$46,549 <span class="moe">± $3,974</span></td>
           
           <td class="peer-value">$48,741</td>
+          <td></td>
+        </tr>
+        
+        <tr>
+          <td class="metric-label">SNAP/food assistance receipt (% of households, total population) <span class="scope-badge">total pop.</span></td>
+          
+          <td class="metric-value">9.5% <span class="moe">± 0.7%</span></td>
+          
+          <td class="peer-value">16.0%</td>
+          <td><span class="flag-dot highlight" title="Better than the NC county average"></span></td>
+        </tr>
+        
+        <tr>
+          <td class="metric-label">No health insurance coverage (% of total population) <span class="scope-badge">total pop.</span></td>
+          
+          <td class="metric-value">10.9% <span class="moe">± 0.7%</span></td>
+          
+          <td class="peer-value">10.5%</td>
           <td></td>
         </tr>
         

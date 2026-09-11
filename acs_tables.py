@@ -192,6 +192,27 @@ def _b21004_derive(cells: dict[str, str], year: int) -> dict[str, tuple[float, f
     return {"veteran_median_income": (_cell(cells, "B21004_002E"), _cell(cells, "B21004_002M"))}
 
 
+# DP03 (Economic Characteristics) -- SNAP/food-stamp receipt and health insurance coverage.
+# Both are household/total-population measures: ACS has no table cross-tabulating either one by
+# Veteran status (confirmed against the live Census API's groups.json -- the only tables that
+# cross-tab by Veteran status at all are B21001/B21002/B21003/B21004/B21005/B21100/C21007, none
+# of which touch SNAP or general health insurance). Distinct table id "DP03G" (G for "general
+# population") since vital_tables.py's DP03V already pulls a different variable subset from this
+# same underlying DP03 table -- separate ids keep their disk caches from colliding. Both codes
+# confirmed stable 2015-2024 against the live Census API.
+_DP03G_VARS = [
+    "DP03_0074PE", "DP03_0074PM",  # Households with SNAP/food stamp benefits in the past 12 months
+    "DP03_0099PE", "DP03_0099PM",  # No health insurance coverage
+]
+
+
+def _dp03g_derive(cells: dict[str, str], year: int) -> dict[str, tuple[float, float]]:
+    return {
+        "snap_pct": (_cell(cells, "DP03_0074PE"), _cell(cells, "DP03_0074PM")),
+        "no_health_insurance_pct": (_cell(cells, "DP03_0099PE"), _cell(cells, "DP03_0099PM")),
+    }
+
+
 TABLES: dict[str, TableSpec] = {
     "DP02": TableSpec("DP02", "acs/acs5/profile", _dp02_vars, _dp02_derive),
     "C21007": TableSpec("C21007", "acs/acs5", lambda year: _C21007_VARS, _c21007_derive),
@@ -199,6 +220,7 @@ TABLES: dict[str, TableSpec] = {
     "C27009": TableSpec("C27009", "acs/acs5", lambda year: _C27009_VARS, _c27009_derive),
     "B21005": TableSpec("B21005", "acs/acs5", lambda year: _B21005_VARS, _b21005_derive),
     "B21004": TableSpec("B21004", "acs/acs5", lambda year: _B21004_VARS, _b21004_derive),
+    "DP03G": TableSpec("DP03G", "acs/acs5/profile", lambda year: _DP03G_VARS, _dp03g_derive),
 }
 
 
@@ -211,6 +233,7 @@ class MapMetricSpec:
     value_format: str  # "percent" | "currency" | "count" | "minutes"
     condition: str = ""  # optional grouping key, e.g. a vital-conditions framework category
     direction: str = "neutral"  # "higher_better" | "lower_better" | "neutral" -- for concern/highlight flagging
+    scope: str = "veteran"  # "veteran" | "total_population" -- who the value is a percentage/measure OF
 
 
 MAP_METRICS: list[MapMetricSpec] = [
@@ -223,17 +246,36 @@ MAP_METRICS: list[MapMetricSpec] = [
     ),
     MapMetricSpec(
         "va_healthcare_pct",
-        "% population with VA health care coverage",
+        "VA health care coverage (% of total population)",
         "C27009",
         "Greens",
         "percent",
         direction="higher_better",
+        scope="total_population",
     ),
     MapMetricSpec(
         "veteran_unemployment_rate", "Veteran unemployment rate", "B21005", "Reds", "percent", direction="lower_better"
     ),
     MapMetricSpec(
         "veteran_median_income", "Median income, Veterans", "B21004", "Tealgrn", "currency", direction="higher_better"
+    ),
+    MapMetricSpec(
+        "snap_pct",
+        "SNAP/food assistance receipt (% of households, total population)",
+        "DP03G",
+        "Purples",
+        "percent",
+        direction="lower_better",
+        scope="total_population",
+    ),
+    MapMetricSpec(
+        "no_health_insurance_pct",
+        "No health insurance coverage (% of total population)",
+        "DP03G",
+        "Oranges",
+        "percent",
+        direction="lower_better",
+        scope="total_population",
     ),
 ]
 

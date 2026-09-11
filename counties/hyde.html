@@ -72,6 +72,10 @@
   .flag-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-left: 0.5em; vertical-align: middle; }
   .flag-dot.highlight { background: var(--flag-good); }
   .flag-dot.concern { background: var(--flag-bad); }
+  .scope-badge {
+    display: inline-block; font-size: 0.68rem; color: var(--text-muted); border: 1px solid var(--border);
+    border-radius: 999px; padding: 0.05rem 0.5rem; vertical-align: middle; white-space: nowrap;
+  }
 
   .reliability-note { color: var(--text-secondary); font-size: 0.8rem; line-height: 1.6; margin: 0 0 1.1rem; padding: 0.7rem 0.9rem; background: var(--page); border-radius: 8px; }
   .reliability-badge { display: inline-flex; align-items: center; gap: 0.3rem; font-size: 0.72rem; color: var(--text-secondary); white-space: nowrap; }
@@ -112,13 +116,13 @@
 <main>
   <h1>Hyde County</h1>
   <p class="subtitle">
-    Veteran executive summary · Generated 2026-09-03 13:46 · ACS 5-year estimates (2024) ·
+    Veteran executive summary · Generated 2026-09-11 14:45 · ACS 5-year estimates (2024) ·
     <a href="../index.html">← Back to statewide map</a>
   </p>
 
   <section class="card">
     <h2>Key points</h2>
-    <p class="caption">Metrics where this county's Veteran population meaningfully outperforms the NC county average, or Veterans outperform civilians in this county</p>
+    <p class="caption">Metrics where this county meaningfully outperforms the NC county average (mostly Veteran-specific; SNAP and health insurance are county-wide), or Veterans outperform civilians here</p>
     
     <p class="empty-note">No metrics clear the NC county average or civilian baseline by more than their margin of error this year.</p>
     
@@ -126,7 +130,7 @@
 
   <section class="card">
     <h2>Areas of concern</h2>
-    <p class="caption">Metrics where this county's Veteran population meaningfully trails the NC county average, or Veterans trail civilians in this county</p>
+    <p class="caption">Metrics where this county meaningfully trails the NC county average (mostly Veteran-specific; SNAP and health insurance are county-wide), or Veterans trail civilians here</p>
     
     <p class="empty-note">No metrics trail the NC county average or civilian baseline by more than their margin of error this year.</p>
     
@@ -242,8 +246,8 @@
   </section>
 
   <section class="card">
-    <h2>All Veteran metrics</h2>
-    <p class="caption">Every tracked Veteran metric for Hyde County, 2024, against the NC county average</p>
+    <h2>All tracked metrics</h2>
+    <p class="caption">Every tracked metric for Hyde County, 2024, against the NC county average. Most are Veteran-specific; two (marked <span class="scope-badge">total pop.</span>) are county-wide context metrics with no Veteran-specific breakdown available anywhere in ACS.</p>
     <table class="metric-table">
       <thead>
         <tr><th>Metric</th><th style="text-align:right;">Hyde County</th><th style="text-align:right;">NC county average</th><th></th></tr>
@@ -278,7 +282,7 @@
         </tr>
         
         <tr>
-          <td class="metric-label">% population with VA health care coverage</td>
+          <td class="metric-label">VA health care coverage (% of total population) <span class="scope-badge">total pop.</span></td>
           
           <td class="metric-value">2.2% <span class="moe">± 1.5%</span></td>
           
@@ -301,6 +305,24 @@
           <td class="metric-value">$50,714 <span class="moe">± $33,088</span></td>
           
           <td class="peer-value">$48,741</td>
+          <td></td>
+        </tr>
+        
+        <tr>
+          <td class="metric-label">SNAP/food assistance receipt (% of households, total population) <span class="scope-badge">total pop.</span></td>
+          
+          <td class="metric-value">22.5% <span class="moe">± 7.2%</span></td>
+          
+          <td class="peer-value">16.0%</td>
+          <td></td>
+        </tr>
+        
+        <tr>
+          <td class="metric-label">No health insurance coverage (% of total population) <span class="scope-badge">total pop.</span></td>
+          
+          <td class="metric-value">15.6% <span class="moe">± 5.9%</span></td>
+          
+          <td class="peer-value">10.5%</td>
           <td></td>
         </tr>
         
@@ -343,7 +365,7 @@
       
       <li>
         <span class="reliability-badge unreliable"><span class="dot"></span></span>
-        <span class="rel-label">% population with VA health care coverage</span>
+        <span class="rel-label">VA health care coverage (% of total population)</span>
         <span class="rel-explainer">Unreliable: the margin of error is very large relative to the estimate. Treat this as a rough signal only, not a precise number.</span>
       </li>
       
@@ -357,6 +379,18 @@
         <span class="reliability-badge unreliable"><span class="dot"></span></span>
         <span class="rel-label">Median income, Veterans</span>
         <span class="rel-explainer">Unreliable: the margin of error is very large relative to the estimate. Treat this as a rough signal only, not a precise number.</span>
+      </li>
+      
+      <li>
+        <span class="reliability-badge caution"><span class="dot"></span></span>
+        <span class="rel-label">SNAP/food assistance receipt (% of households, total population)</span>
+        <span class="rel-explainer">Use with caution: the margin of error is fairly large relative to the estimate. Treat this as an approximate figure, not an exact one.</span>
+      </li>
+      
+      <li>
+        <span class="reliability-badge caution"><span class="dot"></span></span>
+        <span class="rel-label">No health insurance coverage (% of total population)</span>
+        <span class="rel-explainer">Use with caution: the margin of error is fairly large relative to the estimate. Treat this as an approximate figure, not an exact one.</span>
       </li>
       
       <li>

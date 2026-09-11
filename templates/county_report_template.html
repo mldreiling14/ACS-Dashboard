@@ -72,6 +72,10 @@
   .flag-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-left: 0.5em; vertical-align: middle; }
   .flag-dot.highlight { background: var(--flag-good); }
   .flag-dot.concern { background: var(--flag-bad); }
+  .scope-badge {
+    display: inline-block; font-size: 0.68rem; color: var(--text-muted); border: 1px solid var(--border);
+    border-radius: 999px; padding: 0.05rem 0.5rem; vertical-align: middle; white-space: nowrap;
+  }
 
   .reliability-note { color: var(--text-secondary); font-size: 0.8rem; line-height: 1.6; margin: 0 0 1.1rem; padding: 0.7rem 0.9rem; background: var(--page); border-radius: 8px; }
   .reliability-badge { display: inline-flex; align-items: center; gap: 0.3rem; font-size: 0.72rem; color: var(--text-secondary); white-space: nowrap; }
@@ -118,7 +122,7 @@
 
   <section class="card">
     <h2>Key points</h2>
-    <p class="caption">Metrics where this county's Veteran population meaningfully outperforms the NC county average, or Veterans outperform civilians in this county</p>
+    <p class="caption">Metrics where this county meaningfully outperforms the NC county average (mostly Veteran-specific; SNAP and health insurance are county-wide), or Veterans outperform civilians here</p>
     {% if summary.key_points %}
     <ul class="flag-list highlights">
       {% for point in summary.key_points %}
@@ -132,7 +136,7 @@
 
   <section class="card">
     <h2>Areas of concern</h2>
-    <p class="caption">Metrics where this county's Veteran population meaningfully trails the NC county average, or Veterans trail civilians in this county</p>
+    <p class="caption">Metrics where this county meaningfully trails the NC county average (mostly Veteran-specific; SNAP and health insurance are county-wide), or Veterans trail civilians here</p>
     {% if summary.concerns %}
     <ul class="flag-list concerns">
       {% for point in summary.concerns %}
@@ -179,8 +183,8 @@
   </section>
 
   <section class="card">
-    <h2>All Veteran metrics</h2>
-    <p class="caption">Every tracked Veteran metric for {{ summary.name }}, {{ map_year }}, against the NC county average</p>
+    <h2>All tracked metrics</h2>
+    <p class="caption">Every tracked metric for {{ summary.name }}, {{ map_year }}, against the NC county average. Most are Veteran-specific; two (marked <span class="scope-badge">total pop.</span>) are county-wide context metrics with no Veteran-specific breakdown available anywhere in ACS.</p>
     <table class="metric-table">
       <thead>
         <tr><th>Metric</th><th style="text-align:right;">{{ summary.name }}</th><th style="text-align:right;">NC county average</th><th></th></tr>
@@ -188,7 +192,7 @@
       <tbody>
         {% for row in summary.veteran_metrics %}
         <tr>
-          <td class="metric-label">{{ row.metric.label }}</td>
+          <td class="metric-label">{{ row.metric.label }}{% if row.metric.scope == "total_population" %} <span class="scope-badge">total pop.</span>{% endif %}</td>
           {% if row.county %}
           <td class="metric-value">{{ row.county.value | fmt(row.metric.value_format) }} <span class="moe">± {{ row.county.moe | fmt(row.metric.value_format) }}</span></td>
           {% else %}
