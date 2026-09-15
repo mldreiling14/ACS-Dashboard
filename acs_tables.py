@@ -213,6 +213,169 @@ def _dp03g_derive(cells: dict[str, str], year: int) -> dict[str, tuple[float, fl
     }
 
 
+# B21001 -- Sex by Age by Veteran Status (civilian population 18+). One of the few tables
+# that cross-tabs by veteran status, so these are true veteran-vs-civilian comparisons,
+# not just veteran-only or whole-population figures. Codes confirmed live 2015-2023.
+_B21001_VARS = [
+    "B21001_002E", "B21001_002M",  # veteran, total
+    "B21001_003E", "B21001_003M",  # nonveteran (civilian), total
+    "B21001_005E", "B21001_005M",  # veteran, male
+    "B21001_006E", "B21001_006M",  # nonveteran, male
+    "B21001_017E", "B21001_017M",  # veteran, male, 65-74
+    "B21001_018E", "B21001_018M",  # nonveteran, male, 65-74
+    "B21001_020E", "B21001_020M",  # veteran, male, 75+
+    "B21001_021E", "B21001_021M",  # nonveteran, male, 75+
+    "B21001_035E", "B21001_035M",  # veteran, female, 65-74
+    "B21001_036E", "B21001_036M",  # nonveteran, female, 65-74
+    "B21001_038E", "B21001_038M",  # veteran, female, 75+
+    "B21001_039E", "B21001_039M",  # nonveteran, female, 75+
+]
+
+
+def _b21001_rate(cells: dict[str, str], num_codes: list[str], total_code: str, total_moe_code: str) -> tuple[float, float]:
+    total, total_moe = _cell(cells, total_code), _cell(cells, total_moe_code)
+    num = sum(_cell(cells, c) for c in num_codes if c.endswith("E"))
+    num_moe = moe_sum(*(_cell(cells, c) for c in num_codes if c.endswith("M")))
+    if total == 0:
+        return (0.0, 0.0)
+    return (num / total * 100, moe_ratio(num, num_moe, total, total_moe) * 100)
+
+
+def _b21001_derive(cells: dict[str, str], year: int) -> dict[str, tuple[float, float]]:
+    return {
+        "veteran_pct_male": _b21001_rate(cells, ["B21001_005E", "B21001_005M"], "B21001_002E", "B21001_002M"),
+        "civilian_pct_male": _b21001_rate(cells, ["B21001_006E", "B21001_006M"], "B21001_003E", "B21001_003M"),
+        "veteran_pct_65plus": _b21001_rate(
+            cells,
+            ["B21001_017E", "B21001_017M", "B21001_020E", "B21001_020M", "B21001_035E", "B21001_035M", "B21001_038E", "B21001_038M"],
+            "B21001_002E", "B21001_002M",
+        ),
+        "civilian_pct_65plus": _b21001_rate(
+            cells,
+            ["B21001_018E", "B21001_018M", "B21001_021E", "B21001_021M", "B21001_036E", "B21001_036M", "B21001_039E", "B21001_039M"],
+            "B21001_003E", "B21001_003M",
+        ),
+    }
+
+
+# B21003 -- Veteran Status by Educational Attainment (civilian population 25+).
+# Codes confirmed live 2015-2023.
+_B21003_VARS = [
+    "B21003_002E", "B21003_002M",  # veteran, total
+    "B21003_003E", "B21003_003M",  # veteran, less than HS
+    "B21003_006E", "B21003_006M",  # veteran, bachelor's or higher
+    "B21003_007E", "B21003_007M",  # nonveteran (civilian), total
+    "B21003_008E", "B21003_008M",  # nonveteran, less than HS
+    "B21003_011E", "B21003_011M",  # nonveteran, bachelor's or higher
+]
+
+
+def _b21003_derive(cells: dict[str, str], year: int) -> dict[str, tuple[float, float]]:
+    return {
+        "veteran_pct_less_than_hs": _b21001_rate(cells, ["B21003_003E", "B21003_003M"], "B21003_002E", "B21003_002M"),
+        "civilian_pct_less_than_hs": _b21001_rate(cells, ["B21003_008E", "B21003_008M"], "B21003_007E", "B21003_007M"),
+        "veteran_pct_bachelors_plus": _b21001_rate(cells, ["B21003_006E", "B21003_006M"], "B21003_002E", "B21003_002M"),
+        "civilian_pct_bachelors_plus": _b21001_rate(cells, ["B21003_011E", "B21003_011M"], "B21003_007E", "B21003_007M"),
+    }
+
+
+# B21002 -- Period of Military Service for Civilian Veterans 18+. Veteran-only table (no
+# civilian population to compare against) -- shows which service eras a county's veteran
+# population belongs to. Codes confirmed live 2015-2023.
+_B21002_POST911 = ["B21002_002E", "B21002_002M", "B21002_003E", "B21002_003M", "B21002_004E", "B21002_004M"]
+_B21002_VIETNAM = ["B21002_006E", "B21002_006M", "B21002_007E", "B21002_007M", "B21002_008E", "B21002_008M", "B21002_009E", "B21002_009M"]
+_B21002_VARS = ["B21002_001E", "B21002_001M"] + _B21002_POST911 + _B21002_VIETNAM
+
+
+def _b21002_derive(cells: dict[str, str], year: int) -> dict[str, tuple[float, float]]:
+    return {
+        "veteran_pct_post911": _b21001_rate(cells, _B21002_POST911, "B21002_001E", "B21002_001M"),
+        "veteran_pct_vietnam_era": _b21001_rate(cells, _B21002_VIETNAM, "B21002_001E", "B21002_001M"),
+    }
+
+
+# C21001<A/B/I> -- Sex by Age by Veteran Status, iterated by race/ethnicity (same shape as
+# B21001 but split by race). Self-contained within each table: veteran share of that racial
+# group's 18+ population, so comparable across race groups (White/Black/Hispanic here) and to
+# the overall veteran_pct. Not a veteran-vs-civilian split -- see the scope field. Codes
+# confirmed live 2015-2023.
+_RACE_ITER_VET_CODES = ["_004E", "_004M", "_007E", "_007M", "_011E", "_011M", "_014E", "_014M"]
+
+
+def _race_iter_vars(prefix: str) -> list[str]:
+    return [f"{prefix}_001E", f"{prefix}_001M"] + [f"{prefix}{c}" for c in _RACE_ITER_VET_CODES]
+
+
+def _race_iter_derive(metric_key: str, prefix: str) -> Callable[[dict[str, str], int], dict[str, tuple[float, float]]]:
+    def derive(cells: dict[str, str], year: int) -> dict[str, tuple[float, float]]:
+        vet_codes = [f"{prefix}{c}" for c in _RACE_ITER_VET_CODES]
+        return {metric_key: _b21001_rate(cells, vet_codes, f"{prefix}_001E", f"{prefix}_001M")}
+
+    return derive
+
+
+# DP04 -- Selected Housing Characteristics. Whole-population measures: ACS has no table
+# cross-tabulating homeownership/tenure, housing costs, cost burden, or vehicle access by
+# veteran status (same live-API check as the DP03G note above -- only B21001/B21002/B21003/
+# B21004/B21005/B21100/C21007 cross-tab by veteran status, none of which are housing-related).
+# Included as total-population context, labeled accordingly via `scope`. Codes confirmed live
+# 2015-2024.
+_DP04_VARS = [
+    "DP04_0046PE", "DP04_0046PM",  # owner-occupied, % of occupied units
+    "DP04_0047PE", "DP04_0047PM",  # renter-occupied, % of occupied units
+    "DP04_0058PE", "DP04_0058PM",  # no vehicles available, % of occupied units
+    "DP04_0101E", "DP04_0101M",    # median monthly owner costs, units with a mortgage
+    "DP04_0134E", "DP04_0134M",    # median gross rent
+    "DP04_0110E", "DP04_0110M",    # SMOCAPI computable, with mortgage
+    "DP04_0114E", "DP04_0114M",    # SMOCAPI 30.0-34.9%, with mortgage
+    "DP04_0115E", "DP04_0115M",    # SMOCAPI 35.0%+, with mortgage
+    "DP04_0117E", "DP04_0117M",    # SMOCAPI computable, without mortgage
+    "DP04_0123E", "DP04_0123M",    # SMOCAPI 30.0-34.9%, without mortgage
+    "DP04_0124E", "DP04_0124M",    # SMOCAPI 35.0%+, without mortgage
+    "DP04_0136E", "DP04_0136M",    # GRAPI computable
+    "DP04_0141E", "DP04_0141M",    # GRAPI 30.0-34.9%
+    "DP04_0142E", "DP04_0142M",    # GRAPI 35.0%+
+]
+
+
+def _dp04_derive(cells: dict[str, str], year: int) -> dict[str, tuple[float, float]]:
+    # Owner cost burden spans two SMOCAPI subpopulations (with/without a mortgage), so it
+    # can't use _b21001_rate's single-total shape -- combine both totals and both burdened
+    # brackets by hand instead.
+    owner_computable = _cell(cells, "DP04_0110E") + _cell(cells, "DP04_0117E")
+    owner_computable_moe = moe_sum(_cell(cells, "DP04_0110M"), _cell(cells, "DP04_0117M"))
+    owner_burdened = sum(_cell(cells, c) for c in ("DP04_0114E", "DP04_0115E", "DP04_0123E", "DP04_0124E"))
+    owner_burdened_moe = moe_sum(*(_cell(cells, c) for c in ("DP04_0114M", "DP04_0115M", "DP04_0123M", "DP04_0124M")))
+    if owner_computable:
+        owner_burdened_pct = (
+            owner_burdened / owner_computable * 100,
+            moe_ratio(owner_burdened, owner_burdened_moe, owner_computable, owner_computable_moe) * 100,
+        )
+    else:
+        owner_burdened_pct = (0.0, 0.0)
+
+    renter_computable, renter_computable_moe = _cell(cells, "DP04_0136E"), _cell(cells, "DP04_0136M")
+    renter_burdened = sum(_cell(cells, c) for c in ("DP04_0141E", "DP04_0142E"))
+    renter_burdened_moe = moe_sum(*(_cell(cells, c) for c in ("DP04_0141M", "DP04_0142M")))
+    if renter_computable:
+        renter_burdened_pct = (
+            renter_burdened / renter_computable * 100,
+            moe_ratio(renter_burdened, renter_burdened_moe, renter_computable, renter_computable_moe) * 100,
+        )
+    else:
+        renter_burdened_pct = (0.0, 0.0)
+
+    return {
+        "homeownership_rate": (_cell(cells, "DP04_0046PE"), _cell(cells, "DP04_0046PM")),
+        "renter_occupied_pct": (_cell(cells, "DP04_0047PE"), _cell(cells, "DP04_0047PM")),
+        "no_vehicle_pct": (_cell(cells, "DP04_0058PE"), _cell(cells, "DP04_0058PM")),
+        "median_owner_cost_mortgaged": (_cell(cells, "DP04_0101E"), _cell(cells, "DP04_0101M")),
+        "median_gross_rent": (_cell(cells, "DP04_0134E"), _cell(cells, "DP04_0134M")),
+        "cost_burdened_owner_pct": owner_burdened_pct,
+        "cost_burdened_renter_pct": renter_burdened_pct,
+    }
+
+
 TABLES: dict[str, TableSpec] = {
     "DP02": TableSpec("DP02", "acs/acs5/profile", _dp02_vars, _dp02_derive),
     "C21007": TableSpec("C21007", "acs/acs5", lambda year: _C21007_VARS, _c21007_derive),
@@ -221,6 +384,13 @@ TABLES: dict[str, TableSpec] = {
     "B21005": TableSpec("B21005", "acs/acs5", lambda year: _B21005_VARS, _b21005_derive),
     "B21004": TableSpec("B21004", "acs/acs5", lambda year: _B21004_VARS, _b21004_derive),
     "DP03G": TableSpec("DP03G", "acs/acs5/profile", lambda year: _DP03G_VARS, _dp03g_derive),
+    "B21001": TableSpec("B21001", "acs/acs5", lambda year: _B21001_VARS, _b21001_derive),
+    "B21003": TableSpec("B21003", "acs/acs5", lambda year: _B21003_VARS, _b21003_derive),
+    "B21002": TableSpec("B21002", "acs/acs5", lambda year: _B21002_VARS, _b21002_derive),
+    "C21001A": TableSpec("C21001A", "acs/acs5", lambda year: _race_iter_vars("C21001A"), _race_iter_derive("veteran_pct_white", "C21001A")),
+    "C21001B": TableSpec("C21001B", "acs/acs5", lambda year: _race_iter_vars("C21001B"), _race_iter_derive("veteran_pct_black", "C21001B")),
+    "C21001I": TableSpec("C21001I", "acs/acs5", lambda year: _race_iter_vars("C21001I"), _race_iter_derive("veteran_pct_hispanic", "C21001I")),
+    "DP04": TableSpec("DP04", "acs/acs5/profile", lambda year: _DP04_VARS, _dp04_derive),
 }
 
 
@@ -233,7 +403,10 @@ class MapMetricSpec:
     value_format: str  # "percent" | "currency" | "count" | "minutes"
     condition: str = ""  # optional grouping key, e.g. a vital-conditions framework category
     direction: str = "neutral"  # "higher_better" | "lower_better" | "neutral" -- for concern/highlight flagging
-    scope: str = "veteran"  # "veteran" | "total_population" -- who the value is a percentage/measure OF
+    # "veteran" | "civilian" | "total_population" -- who the value is a percentage/measure OF.
+    # "civilian" = the nonveteran population (true veteran-vs-civilian pairs use this against a
+    # "veteran"-scoped counterpart); "total_population" = everyone, veterans included.
+    scope: str = "veteran"
 
 
 MAP_METRICS: list[MapMetricSpec] = [
@@ -276,6 +449,73 @@ MAP_METRICS: list[MapMetricSpec] = [
         "percent",
         direction="lower_better",
         scope="total_population",
+    ),
+    # --- Demographics: age/sex, education, service era, race -- true veteran-vs-civilian
+    # pairs where Census publishes the cross-tab (B21001/B21003), veteran-only where it
+    # doesn't (B21002), and veteran representation within race groups (C21001A/B/I).
+    MapMetricSpec("veteran_pct_male", "% Male, Veterans", "B21001", "Blues", "percent", scope="veteran"),
+    MapMetricSpec("civilian_pct_male", "% Male, Civilians (non-veterans)", "B21001", "Bluyl", "percent", scope="civilian"),
+    MapMetricSpec("veteran_pct_65plus", "% Age 65+, Veterans", "B21001", "Purples", "percent", scope="veteran"),
+    MapMetricSpec("civilian_pct_65plus", "% Age 65+, Civilians (non-veterans)", "B21001", "Purpor", "percent", scope="civilian"),
+    MapMetricSpec(
+        "veteran_pct_less_than_hs", "% Less than high school, Veterans", "B21003", "Reds", "percent",
+        direction="lower_better", scope="veteran",
+    ),
+    MapMetricSpec(
+        "civilian_pct_less_than_hs", "% Less than high school, Civilians (non-veterans)", "B21003", "Burg", "percent",
+        direction="lower_better", scope="civilian",
+    ),
+    MapMetricSpec(
+        "veteran_pct_bachelors_plus", "% Bachelor's degree or higher, Veterans", "B21003", "Greens", "percent",
+        direction="higher_better", scope="veteran",
+    ),
+    MapMetricSpec(
+        "civilian_pct_bachelors_plus", "% Bachelor's degree or higher, Civilians (non-veterans)", "B21003", "Tealgrn",
+        "percent", direction="higher_better", scope="civilian",
+    ),
+    MapMetricSpec("veteran_pct_post911", "% Post-9/11 era, Veterans", "B21002", "Sunset", "percent", scope="veteran"),
+    MapMetricSpec("veteran_pct_vietnam_era", "% Vietnam era, Veterans", "B21002", "Agsunset", "percent", scope="veteran"),
+    MapMetricSpec(
+        "veteran_pct_white", "Veteran share of White population (18+)", "C21001A", "Blues", "percent",
+        scope="total_population",
+    ),
+    MapMetricSpec(
+        "veteran_pct_black", "Veteran share of Black or African American population (18+)", "C21001B", "Purples",
+        "percent", scope="total_population",
+    ),
+    MapMetricSpec(
+        "veteran_pct_hispanic", "Veteran share of Hispanic or Latino population (18+)", "C21001I", "Oranges",
+        "percent", scope="total_population",
+    ),
+    # --- Housing & vehicle access: whole-population only (see DP04 note above), included as
+    # context alongside the veteran-specific metrics.
+    MapMetricSpec(
+        "homeownership_rate", "Homeownership rate (% of occupied units, total population)", "DP04", "Tealgrn",
+        "percent", direction="higher_better", scope="total_population",
+    ),
+    MapMetricSpec(
+        "renter_occupied_pct", "Renter-occupied housing units (% of occupied units, total population)", "DP04",
+        "Purples", "percent", scope="total_population",
+    ),
+    MapMetricSpec(
+        "no_vehicle_pct", "No vehicle available (% of occupied units, total population)", "DP04", "Reds", "percent",
+        direction="lower_better", scope="total_population",
+    ),
+    MapMetricSpec(
+        "median_owner_cost_mortgaged", "Median monthly owner costs, mortgaged homes (total population)", "DP04",
+        "Greens", "currency", scope="total_population",
+    ),
+    MapMetricSpec(
+        "median_gross_rent", "Median gross rent (total population)", "DP04", "Bluyl", "currency",
+        scope="total_population",
+    ),
+    MapMetricSpec(
+        "cost_burdened_owner_pct", "Cost-burdened homeowners, 30%+ of income (total population)", "DP04", "Oranges",
+        "percent", direction="lower_better", scope="total_population",
+    ),
+    MapMetricSpec(
+        "cost_burdened_renter_pct", "Cost-burdened renters, 30%+ of income (total population)", "DP04", "Burgyl",
+        "percent", direction="lower_better", scope="total_population",
     ),
 ]
 

@@ -47,7 +47,8 @@ CREATE TABLE IF NOT EXISTS metric_catalog (
     metric_key    TEXT PRIMARY KEY,
     label         TEXT NOT NULL,
     table_id      TEXT NOT NULL,
-    value_format  TEXT NOT NULL
+    value_format  TEXT NOT NULL,
+    scope         TEXT NOT NULL DEFAULT 'veteran'
 );
 
 CREATE INDEX IF NOT EXISTS idx_metrics_year ON metrics(year);
@@ -91,8 +92,8 @@ def build_database(force_refresh: bool = False, db_path: Path = DB_PATH) -> Metr
             "INSERT OR REPLACE INTO metrics VALUES (?,?,?,?,?,?,?,?,?,?,?)",
             metric_rows,
         )
-        catalog_rows = [(m.key, m.label, m.table_id, m.value_format) for m in ALL_TABLE_METRICS]
-        conn.executemany("INSERT OR REPLACE INTO metric_catalog VALUES (?,?,?,?)", catalog_rows)
+        catalog_rows = [(m.key, m.label, m.table_id, m.value_format, m.scope) for m in ALL_TABLE_METRICS]
+        conn.executemany("INSERT OR REPLACE INTO metric_catalog VALUES (?,?,?,?,?)", catalog_rows)
         conn.commit()
     finally:
         conn.close()
